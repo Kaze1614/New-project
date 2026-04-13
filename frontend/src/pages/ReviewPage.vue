@@ -1,47 +1,74 @@
 <template>
-  <section class="panel-card">
-    <h3>待复习</h3>
-    <p v-if="loading">加载中...</p>
-    <p v-else-if="!tasks.length">当前无待复习任务。</p>
-    <ul v-else class="item-list">
-      <li v-for="task in tasks" :key="task.id" class="item-card">
-        <div class="item-head">
-          <h4>{{ task.questionTitle }}</h4>
-          <span class="status-chip" :class="task.completed ? 'ok' : 'todo'">{{ task.completed ? '已完成' : '未完成' }}</span>
+  <section class="review-page">
+    <header class="review-head">
+      <h2>渐进式复习</h2>
+      <p>盲回演算后再看官方解析，最后进行自我评级。</p>
+    </header>
+
+    <article v-if="reviewStore.loading" class="panel-card">加载复习任务中...</article>
+
+    <article v-else-if="!reviewStore.currentTask" class="panel-card empty-review">
+      <h3>今日复习已清空</h3>
+      <p>当前没有到期卡片，可先去刷题页继续训练。</p>
+    </article>
+
+    <article v-else class="review-card">
+      <p class="review-badge">任务截止：{{ formatTime(reviewStore.currentTask.dueDate) }}</p>
+      <h3>{{ reviewStore.currentTask.questionTitle }}</h3>
+      <p class="review-content">{{ reviewStore.currentTask.questionContent }}</p>
+
+      <section v-if="reviewStore.phase === 'blind'" class="blind-phase">
+        <p>请先在草稿纸独立演算，再点击下方按钮查看标准解析。</p>
+        <button class="primary-btn" type="button" @click="reviewStore.reveal()">查看标准解析</button>
+      </section>
+
+      <section v-else class="reveal-phase">
+        <div class="official-box">
+          <p><strong>官方答案：</strong>{{ reviewStore.currentTask.officialAnswer || '无' }}</p>
+          <p><strong>官方解析：</strong>{{ reviewStore.currentTask.officialExplanation || '暂无解析' }}</p>
+          <button class="ghost-btn" type="button" @click="openAIExplain">💡 没看懂解析？</button>
         </div>
-        <p>{{ task.questionContent }}</p>
-        <p>截止时间：{{ formatDate(task.dueDate) }}</p>
-        <button v-if="!task.completed" class="primary-btn" type="button" @click="complete(task.id)">标记完成</button>
-      </li>
-    </ul>
+
+        <div class="rating-row">
+          <button class="rating danger" type="button" :disabled="reviewStore.rating" @click="rate('again')">
+            🔴 算错了
+          </button>
+          <button class="rating warn" type="button" :disabled="reviewStore.rating" @click="rate('hard')">
+            🟡 有点模糊
+          </button>
+          <button class="rating ok" type="button" :disabled="reviewStore.rating" @click="rate('easy')">
+            🟢 轻松秒杀
+          </button>
+        </div>
+      </section>
+    </article>
   </section>
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
-import { api, unwrap } from '../api/client'
+import { onMounted } from 'vue'
+import { useReviewStore } from '../stores/review'
+import { useUiStore } from '../stores/ui'
 
-const loading = ref(false)
-const tasks = ref([])
+const reviewStore = useReviewStore()
+const uiStore = useUiStore()
 
-function formatDate(text) {
-  if (!text) return '--'
-  return new Date(text).toLocaleString('zh-CN', { hour12: false })
+onMounted(() => {
+  reviewStore.loadNext()
+})
+
+function formatTime(value) {
+  if (!value) return '--'
+  return new Date(value).toLocaleString('zh-CN', { hour12: false })
 }
 
-async function load() {
-  loading.value = true
-  try {
-    tasks.value = await unwrap(api.get('/review/tasks'))
-  } finally {
-    loading.value = false
-  }
+async function rate(grade) {
+  await reviewStore.rate(grade)
 }
 
-async function complete(id) {
-  const updated = await unwrap(api.post(`/review/tasks/${id}/complete`))
-  tasks.value = tasks.value.map((task) => (task.id === id ? updated : task))
+function openAIExplain() {
+  if (!reviewStore.currentTask) return
+  const context = `题目：${reviewStore.currentTask.questionContent}\n官方解析：${reviewStore.currentTask.officialExplanation || '暂无'}`
+  uiStore.openAIDrawer(context)
 }
-
-onMounted(load)
 </script>

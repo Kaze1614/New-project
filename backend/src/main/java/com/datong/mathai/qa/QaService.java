@@ -87,6 +87,9 @@ public class QaService {
             (rs, rowNum) -> rs.getString("role") + ": " + rs.getString("content"),
             sessionId
         );
+        if (request.context() != null && !request.context().isBlank()) {
+            context.add(0, "context: " + request.context().trim());
+        }
 
         ChatReplyPayload reply = aiProvider.reply(request.content(), context);
         LocalDateTime assistantNow = LocalDateTime.now();

@@ -4,7 +4,9 @@ import java.time.LocalDateTime;
 
 public record MistakeItem(
     Long id,
+    Long questionId,
     Long chapterId,
+    String difficulty,
     String questionTitle,
     String questionContent,
     String imageUrl,

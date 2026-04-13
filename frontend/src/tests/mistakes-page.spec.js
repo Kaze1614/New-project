@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { createPinia } from 'pinia'
 import { flushPromises, mount } from '@vue/test-utils'
 
 vi.mock('../api/client', () => {
@@ -13,33 +14,25 @@ import MistakesPage from '../pages/MistakesPage.vue'
 import { api } from '../api/client'
 
 describe('MistakesPage', () => {
-  it('shows analysis details after analyze action', async () => {
+  it('renders lightweight grid cards with filter bar', async () => {
     api.get.mockResolvedValueOnce([
       {
         id: 1,
         chapterId: 4,
-        questionTitle: '极限题',
-        questionContent: '求极限',
-        imageUrl: null,
-        status: 'NEW',
-        analysis: null
+        difficulty: 'MEDIUM',
+        questionTitle: '函数定义域判定',
+        questionContent: '函数 f(x)=1/(x-2) 的定义域是？'
       }
     ])
-    api.post.mockResolvedValueOnce({
-      knowledgePoints: ['极限存在性'],
-      errorType: '概念混淆',
-      solvingSteps: ['步骤1', '步骤2'],
-      variants: ['变式1'],
-      followUpSuggestions: ['建议1']
+
+    const wrapper = mount(MistakesPage, {
+      global: { plugins: [createPinia()] }
     })
-
-    const wrapper = mount(MistakesPage)
     await flushPromises()
 
-    await wrapper.findAll('button').find((btn) => btn.text() === 'AI分析').trigger('click')
-    await flushPromises()
-
-    expect(wrapper.text()).toContain('概念混淆')
-    expect(wrapper.text()).toContain('极限存在性')
+    expect(wrapper.find('.filter-bar').exists()).toBe(true)
+    expect(wrapper.find('.question-grid').exists()).toBe(true)
+    expect(wrapper.text()).toContain('函数定义域判定')
+    expect(wrapper.text()).not.toContain('AI分析')
   })
 })

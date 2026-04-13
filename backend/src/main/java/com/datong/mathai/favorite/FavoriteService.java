@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -21,16 +22,38 @@ public class FavoriteService {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    public List<FavoriteItem> list(Long userId) {
+    public List<FavoriteItem> list(Long userId, Long chapterId, String difficulty, String keyword) {
+        StringBuilder sql = new StringBuilder("SELECT id, chapter_id, difficulty, title, content, created_at FROM favorites WHERE user_id = ?");
+        List<Object> args = new ArrayList<>();
+        args.add(userId);
+
+        if (chapterId != null) {
+            sql.append(" AND chapter_id = ?");
+            args.add(chapterId);
+        }
+        if (difficulty != null && !difficulty.isBlank()) {
+            sql.append(" AND difficulty = ?");
+            args.add(difficulty.trim().toUpperCase());
+        }
+        if (keyword != null && !keyword.isBlank()) {
+            sql.append(" AND (title LIKE ? OR content LIKE ?)");
+            String like = "%" + keyword.trim() + "%";
+            args.add(like);
+            args.add(like);
+        }
+        sql.append(" ORDER BY created_at DESC");
+
         return jdbcTemplate.query(
-            "SELECT id, title, content, created_at FROM favorites WHERE user_id = ? ORDER BY created_at DESC",
+            sql.toString(),
             (rs, rowNum) -> new FavoriteItem(
                 rs.getLong("id"),
+                rs.getObject("chapter_id") == null ? null : rs.getLong("chapter_id"),
+                rs.getString("difficulty"),
                 rs.getString("title"),
                 rs.getString("content"),
                 rs.getTimestamp("created_at").toLocalDateTime()
             ),
-            userId
+            args.toArray()
         );
     }
 
@@ -39,18 +62,24 @@ public class FavoriteService {
         KeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(connection -> {
             PreparedStatement ps = connection.prepareStatement(
-                "INSERT INTO favorites(user_id, title, content, created_at) VALUES(?,?,?,?)",
+                "INSERT INTO favorites(user_id, chapter_id, difficulty, title, content, created_at) VALUES(?,?,?,?,?,?)",
                 Statement.RETURN_GENERATED_KEYS
             );
             ps.setLong(1, userId);
-            ps.setString(2, request.title());
-            ps.setString(3, request.content());
-            ps.setTimestamp(4, java.sql.Timestamp.valueOf(now));
+            if (request.chapterId() == null) {
+                ps.setObject(2, null);
+            } else {
+                ps.setLong(2, request.chapterId());
+            }
+            ps.setString(3, request.difficulty() == null ? null : request.difficulty().trim().toUpperCase());
+            ps.setString(4, request.title());
+            ps.setString(5, request.content());
+            ps.setTimestamp(6, java.sql.Timestamp.valueOf(now));
             return ps;
         }, keyHolder);
 
         Long id = extractId(keyHolder, "Create favorite failed");
-        return new FavoriteItem(id, request.title(), request.content(), now);
+        return new FavoriteItem(id, request.chapterId(), request.difficulty(), request.title(), request.content(), now);
     }
 
     public void delete(Long userId, Long id) {

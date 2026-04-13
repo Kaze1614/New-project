@@ -20,8 +20,13 @@ public class FavoriteController {
     }
 
     @GetMapping
-    public ApiResponse<List<FavoriteItem>> list(@RequestHeader(value = "Authorization", required = false) String authorization) {
-        return ApiResponse.ok(favoriteService.list(authService.requireUserId(authorization)));
+    public ApiResponse<List<FavoriteItem>> list(
+        @RequestHeader(value = "Authorization", required = false) String authorization,
+        @RequestParam(required = false) Long chapterId,
+        @RequestParam(required = false) String difficulty,
+        @RequestParam(required = false) String keyword
+    ) {
+        return ApiResponse.ok(favoriteService.list(authService.requireUserId(authorization), chapterId, difficulty, keyword));
     }
 
     @PostMapping

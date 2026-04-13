@@ -20,9 +20,14 @@ public class MistakeController {
     }
 
     @GetMapping
-    public ApiResponse<List<MistakeItem>> list(@RequestHeader(value = "Authorization", required = false) String authorization) {
+    public ApiResponse<List<MistakeItem>> list(
+        @RequestHeader(value = "Authorization", required = false) String authorization,
+        @RequestParam(required = false) Long chapterId,
+        @RequestParam(required = false) String difficulty,
+        @RequestParam(required = false) String keyword
+    ) {
         Long userId = authService.requireUserId(authorization);
-        return ApiResponse.ok(mistakeService.list(userId));
+        return ApiResponse.ok(mistakeService.list(userId, chapterId, difficulty, keyword));
     }
 
     @PostMapping

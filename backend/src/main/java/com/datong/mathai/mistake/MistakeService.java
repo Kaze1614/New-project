@@ -14,6 +14,7 @@ import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -31,17 +32,34 @@ public class MistakeService {
         this.objectMapper = objectMapper;
     }
 
-    public List<MistakeItem> list(Long userId) {
-        String sql = """
-            SELECT m.id, m.chapter_id, m.question_title, m.question_content, m.image_url, m.status, m.created_at, m.updated_at,
+    public List<MistakeItem> list(Long userId, Long chapterId, String difficulty, String keyword) {
+        StringBuilder sql = new StringBuilder("""
+            SELECT m.id, m.question_id, m.chapter_id, m.difficulty, m.question_title, m.question_content, m.image_url, m.status, m.created_at, m.updated_at,
                    a.error_type, a.knowledge_points_json, a.solving_steps_json, a.variants_json, a.follow_up_json
             FROM mistake_records m
             LEFT JOIN mistake_analysis a ON m.id = a.mistake_id
             WHERE m.user_id = ?
-            ORDER BY m.created_at DESC
-            """;
+            """);
+        List<Object> args = new ArrayList<>();
+        args.add(userId);
 
-        return jdbcTemplate.query(sql, (rs, rowNum) -> {
+        if (chapterId != null) {
+            sql.append(" AND m.chapter_id = ?");
+            args.add(chapterId);
+        }
+        if (difficulty != null && !difficulty.isBlank()) {
+            sql.append(" AND m.difficulty = ?");
+            args.add(difficulty.trim().toUpperCase());
+        }
+        if (keyword != null && !keyword.isBlank()) {
+            sql.append(" AND (m.question_title LIKE ? OR m.question_content LIKE ?)");
+            String like = "%" + keyword.trim() + "%";
+            args.add(like);
+            args.add(like);
+        }
+        sql.append(" ORDER BY m.created_at DESC");
+
+        return jdbcTemplate.query(sql.toString(), (rs, rowNum) -> {
             MistakeAnalysisView analysisView = null;
             if (rs.getString("error_type") != null) {
                 analysisView = new MistakeAnalysisView(
@@ -55,7 +73,9 @@ public class MistakeService {
 
             return new MistakeItem(
                 rs.getLong("id"),
+                rs.getObject("question_id") == null ? null : rs.getLong("question_id"),
                 rs.getObject("chapter_id") == null ? null : rs.getLong("chapter_id"),
+                rs.getString("difficulty"),
                 rs.getString("question_title"),
                 rs.getString("question_content"),
                 rs.getString("image_url"),
@@ -64,7 +84,7 @@ public class MistakeService {
                 rs.getTimestamp("updated_at").toLocalDateTime(),
                 analysisView
             );
-        }, userId);
+        }, args.toArray());
     }
 
     public MistakeItem create(Long userId, CreateMistakeRequest request) {
@@ -72,26 +92,28 @@ public class MistakeService {
         KeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(connection -> {
             PreparedStatement ps = connection.prepareStatement(
-                "INSERT INTO mistake_records(user_id, chapter_id, question_title, question_content, image_url, status, created_at, updated_at) VALUES(?,?,?,?,?,?,?,?)",
+                "INSERT INTO mistake_records(user_id, question_id, chapter_id, difficulty, question_title, question_content, image_url, status, created_at, updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
                 Statement.RETURN_GENERATED_KEYS
             );
             ps.setLong(1, userId);
+            ps.setObject(2, null);
             if (request.chapterId() == null) {
-                ps.setObject(2, null);
+                ps.setObject(3, null);
             } else {
-                ps.setLong(2, request.chapterId());
+                ps.setLong(3, request.chapterId());
             }
-            ps.setString(3, request.questionTitle());
-            ps.setString(4, request.questionContent());
-            ps.setString(5, request.imageUrl());
-            ps.setString(6, "NEW");
-            ps.setTimestamp(7, Timestamp.valueOf(now));
-            ps.setTimestamp(8, Timestamp.valueOf(now));
+            ps.setObject(4, null);
+            ps.setString(5, request.questionTitle());
+            ps.setString(6, request.questionContent());
+            ps.setString(7, request.imageUrl());
+            ps.setString(8, "NEW");
+            ps.setTimestamp(9, Timestamp.valueOf(now));
+            ps.setTimestamp(10, Timestamp.valueOf(now));
             return ps;
         }, keyHolder);
 
         Long id = extractId(keyHolder, "Create mistake failed");
-        return new MistakeItem(id, request.chapterId(), request.questionTitle(), request.questionContent(), request.imageUrl(), "NEW", now, now, null);
+        return new MistakeItem(id, null, request.chapterId(), null, request.questionTitle(), request.questionContent(), request.imageUrl(), "NEW", now, now, null);
     }
 
     public void delete(Long userId, Long id) {
