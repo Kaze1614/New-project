@@ -2,19 +2,26 @@
   <section class="study-page">
     <header class="study-head">
       <h2>沉浸式刷题</h2>
-      <p>题目与解析均来自题库，提交后才展示官方答案。</p>
+      <p>题目与答案来自题库；提交本组后展示标准答案与解析来源。</p>
     </header>
 
     <div v-if="studyStore.loading" class="panel-card">组卷中...</div>
     <div v-else-if="!session" class="panel-card">当前暂无可用学习会话。</div>
     <div v-else class="study-layout">
       <article class="study-main">
-        <p class="question-index">第 {{ currentIndex + 1 }} / {{ session.items.length }} 题</p>
+        <div class="question-meta">
+          <p class="question-index">第 {{ currentIndex + 1 }} / {{ session.items.length }} 题</p>
+          <span v-if="currentItem.sourceLabel" class="source-pill">{{ currentItem.sourceLabel }}</span>
+        </div>
+
         <h3 class="question-title">{{ currentItem.title }}</h3>
         <p class="question-content">{{ currentItem.content }}</p>
+        <p v-if="currentItem.sourceSnapshotPath" class="source-path">
+          原卷资源：{{ currentItem.sourceSnapshotPath }}
+        </p>
 
         <div class="answer-panel">
-          <template v-if="isSingleChoice(currentItem)">
+          <template v-if="isChoice(currentItem)">
             <button
               v-for="option in currentItem.options || []"
               :key="option"
@@ -29,9 +36,9 @@
 
           <template v-else>
             <label class="fill-answer">
-              填空答案
+              作答区域
               <div class="fill-row">
-                <input v-model.trim="fillDraft" type="text" maxlength="100" @keyup.enter="saveFillAnswer" />
+                <input v-model.trim="fillDraft" type="text" maxlength="200" @keyup.enter="saveFillAnswer" />
                 <button class="outline-btn" type="button" @click="saveFillAnswer">保存答案</button>
               </div>
             </label>
@@ -40,12 +47,15 @@
 
         <div v-if="session.submitted" class="result-panel">
           <p>
-            <strong>官方答案：</strong>
-            {{ currentItem.officialAnswer || '无' }}
+            <strong>标准答案：</strong>
+            {{ currentItem.officialAnswer || '暂无' }}
           </p>
           <p>
-            <strong>官方解析：</strong>
+            <strong>{{ explanationTitle(currentItem) }}：</strong>
             {{ currentItem.officialExplanation || '暂无解析' }}
+          </p>
+          <p v-if="currentItem.explanationReviewStatus === 'PENDING_REVIEW'" class="review-warning">
+            该解析为教师补充解析或题面含公式图片，建议人工复核后用于正式练习。
           </p>
           <button class="ghost-btn" type="button" @click="askAIForCurrent">
             💡 没看懂解析？
@@ -149,8 +159,8 @@ onUnmounted(() => {
   if (timer) window.clearInterval(timer)
 })
 
-function isSingleChoice(item) {
-  return item?.type === 'SINGLE' && Array.isArray(item?.options) && item.options.length > 0
+function isChoice(item) {
+  return ['SINGLE', 'MULTI'].includes(item?.type) && Array.isArray(item?.options) && item.options.length > 0
 }
 
 function extractOptionCode(option) {
@@ -158,14 +168,28 @@ function extractOptionCode(option) {
   return match ? match[1] : String(option).trim().toUpperCase()
 }
 
+function selectedCodes() {
+  if (!currentItem.value?.userAnswer) return []
+  return currentItem.value.userAnswer
+    .split(',')
+    .map((value) => value.trim().toUpperCase())
+    .filter(Boolean)
+}
+
 function isSelected(option) {
-  if (!currentItem.value?.userAnswer) return false
-  return currentItem.value.userAnswer.toUpperCase() === extractOptionCode(option)
+  return selectedCodes().includes(extractOptionCode(option))
 }
 
 async function selectOption(option) {
   if (!session.value || !currentItem.value || session.value.submitted) return
-  await studyStore.saveAnswer(session.value.id, currentItem.value.itemId, extractOptionCode(option))
+  const code = extractOptionCode(option)
+  if (currentItem.value.type === 'MULTI') {
+    const next = new Set(selectedCodes())
+    next.has(code) ? next.delete(code) : next.add(code)
+    await studyStore.saveAnswer(session.value.id, currentItem.value.itemId, [...next].sort().join(''))
+    return
+  }
+  await studyStore.saveAnswer(session.value.id, currentItem.value.itemId, code)
 }
 
 async function saveFillAnswer() {
@@ -197,9 +221,18 @@ async function submitSession() {
   await studyStore.submitSession(session.value.id)
 }
 
+function explanationTitle(item) {
+  return item?.explanationSource === 'TEACHER_GENERATED' ? '教师补充解析' : '官方解析'
+}
+
 function askAIForCurrent() {
   if (!currentItem.value) return
-  const context = `题目：${currentItem.value.content}\n官方答案：${currentItem.value.officialAnswer || '无'}\n官方解析：${currentItem.value.officialExplanation || '暂无'}`
+  const context = [
+    `出处：${currentItem.value.sourceLabel || '题库题目'}`,
+    `题目：${currentItem.value.content}`,
+    `标准答案：${currentItem.value.officialAnswer || '暂无'}`,
+    `${explanationTitle(currentItem.value)}：${currentItem.value.officialExplanation || '暂无'}`,
+  ].join('\n')
   uiStore.openAIDrawer(context)
 }
 </script>

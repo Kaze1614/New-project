@@ -2,9 +2,15 @@ import { describe, expect, it, vi } from 'vitest'
 import { createPinia } from 'pinia'
 import { flushPromises, mount } from '@vue/test-utils'
 
+const push = vi.fn()
+
 const hoisted = vi.hoisted(() => ({
   postMock: vi.fn(),
   getMock: vi.fn()
+}))
+
+vi.mock('vue-router', () => ({
+  useRouter: () => ({ push })
 }))
 
 vi.mock('../api/client', () => {
@@ -28,7 +34,29 @@ import { useAuthStore } from '../stores/auth'
 import { useUiStore } from '../stores/ui'
 
 describe('AIAssistantDrawer', () => {
-  it('opens with context and injects it on first message', async () => {
+  it('shows login guidance for guests and hides chat input', async () => {
+    const pinia = createPinia()
+    const wrapper = mount(AIAssistantDrawer, {
+      global: {
+        plugins: [pinia]
+      }
+    })
+
+    const uiStore = useUiStore()
+    uiStore.openAIDrawer()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('欢迎来到数学园！AI 导师已就绪')
+    expect(wrapper.text()).toContain('前往登录')
+    expect(wrapper.find('.ai-footer').exists()).toBe(false)
+    expect(wrapper.find('.ai-form').exists()).toBe(false)
+
+    await wrapper.find('.ai-guest-card .primary-btn').trigger('click')
+    expect(uiStore.aiDrawerOpen).toBe(false)
+    expect(push).toHaveBeenCalledWith('/login')
+  })
+
+  it('opens with context and injects it on first message when logged in', async () => {
     hoisted.getMock.mockResolvedValue([])
     hoisted.postMock.mockImplementation((url, payload) => {
       if (url === '/qa/sessions') return Promise.resolve({ id: 11, title: '全局答疑' })
@@ -44,10 +72,7 @@ describe('AIAssistantDrawer', () => {
     const pinia = createPinia()
     const wrapper = mount(AIAssistantDrawer, {
       global: {
-        plugins: [pinia],
-        stubs: {
-          RouterLink: { template: '<a><slot /></a>' }
-        }
+        plugins: [pinia]
       }
     })
 

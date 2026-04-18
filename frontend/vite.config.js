@@ -7,9 +7,13 @@ export default defineConfig({
   plugins: [vue()],
   server: {
     host: '0.0.0.0',
-    port: 18000,
+    port: 5173,
     proxy: {
       '/api': {
+        target: proxyTarget,
+        changeOrigin: true
+      },
+      '/uploads': {
         target: proxyTarget,
         changeOrigin: true
       }

@@ -4,9 +4,7 @@ export const useUiStore = defineStore('ui', {
   state: () => ({
     aiDrawerOpen: false,
     aiSessionId: null,
-    aiPendingContext: '',
-    chapterTree: [],
-    chapterFlyoutOpen: false
+    aiPendingContext: ''
   }),
   actions: {
     openAIDrawer(context = '') {
@@ -25,12 +23,6 @@ export const useUiStore = defineStore('ui', {
       const context = this.aiPendingContext
       this.aiPendingContext = ''
       return context
-    },
-    setChapterTree(nodes) {
-      this.chapterTree = Array.isArray(nodes) ? nodes : []
-    },
-    setChapterFlyoutOpen(open) {
-      this.chapterFlyoutOpen = open
     }
   }
 })

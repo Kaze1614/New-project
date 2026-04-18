@@ -29,7 +29,7 @@
           }}
         </p>
         <div class="ring-wrap">
-          <svg viewBox="0 0 120 120" class="ring">
+          <svg viewBox="0 0 120 120" class="ring" aria-hidden="true">
             <circle cx="60" cy="60" r="48" class="ring-track" />
             <circle
               cx="60"
@@ -56,12 +56,14 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { api, tokenStorage, unwrap } from '../api/client'
 
+const stats = reactive({
+  total: 15200,
+  mastered: 8900,
+  review: 450,
+  today: 125
+})
+
 const overview = reactive({
-  questionBankTotal: 0,
-  totalMistakes: 0,
-  mastered: 0,
-  pendingReview: 0,
-  todayCompleted: 0,
   criticalReviewCount: 0,
   weakSpotHint: ''
 })
@@ -69,17 +71,17 @@ const overview = reactive({
 const isGuest = ref(!tokenStorage.get())
 
 const kpiCards = computed(() => [
-  { label: '题库总量', value: isGuest.value ? '--' : overview.questionBankTotal },
-  { label: '已经掌握', value: isGuest.value ? '--' : overview.mastered },
-  { label: '待复习', value: isGuest.value ? '--' : overview.pendingReview },
-  { label: '今日完成', value: isGuest.value ? '--' : overview.todayCompleted }
+  { label: '题库总量', value: isGuest.value ? '--' : stats.total },
+  { label: '已经掌握', value: isGuest.value ? '--' : stats.mastered },
+  { label: '待复习', value: isGuest.value ? '--' : stats.review },
+  { label: '今日完成', value: isGuest.value ? '--' : stats.today }
 ])
 
 const ringPercent = computed(() => {
   if (isGuest.value) {
     return 0
   }
-  const base = Math.max(overview.pendingReview, 1)
+  const base = Math.max(stats.review, 1)
   return Math.min(100, Math.round((overview.criticalReviewCount / base) * 100))
 })
 
@@ -91,7 +93,12 @@ async function loadOverview() {
   }
   try {
     const data = await unwrap(api.get('/dashboard/overview'))
-    Object.assign(overview, data)
+    stats.total = data.questionBankTotal ?? stats.total
+    stats.mastered = data.mastered ?? stats.mastered
+    stats.review = data.pendingReview ?? stats.review
+    stats.today = data.todayCompleted ?? stats.today
+    overview.criticalReviewCount = data.criticalReviewCount ?? overview.criticalReviewCount
+    overview.weakSpotHint = data.weakSpotHint ?? overview.weakSpotHint
   } catch (error) {
     if (error?.response?.status === 401) {
       isGuest.value = true

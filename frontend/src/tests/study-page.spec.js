@@ -32,7 +32,11 @@ function makeSession({ submitted = false, answered = false } = {}) {
       answered: answered && index === 0,
       correct: submitted && index === 0 ? false : null,
       officialAnswer: submitted ? 'B' : null,
-      officialExplanation: submitted ? '官方解析' : null
+      officialExplanation: submitted ? '教师补充解析内容' : null,
+      explanationSource: submitted ? 'TEACHER_GENERATED' : null,
+      explanationReviewStatus: submitted ? 'PENDING_REVIEW' : null,
+      sourceLabel: `${index + 1}.(2025)(全国I卷)`,
+      sourceSnapshotPath: null
     }))
   }
 }
@@ -65,7 +69,7 @@ import StudyPage from '../pages/StudyPage.vue'
 import { api } from '../api/client'
 
 describe('StudyPage', () => {
-  it('renders 7:3 layout with 20-cell matrix and submit flow', async () => {
+  it('renders 7:3 layout with source label, matrix and submit flow', async () => {
     const wrapper = mount(StudyPage, {
       global: {
         plugins: [createPinia()]
@@ -75,6 +79,7 @@ describe('StudyPage', () => {
 
     expect(wrapper.find('.study-layout').exists()).toBe(true)
     expect(wrapper.findAll('.matrix-cell')).toHaveLength(20)
+    expect(wrapper.text()).toContain('1.(2025)(全国I卷)')
 
     await wrapper.find('.option-card').trigger('click')
     await flushPromises()
@@ -85,6 +90,6 @@ describe('StudyPage', () => {
 
     await wrapper.findAll('.primary-btn')[0].trigger('click')
     await flushPromises()
-    expect(wrapper.text()).toContain('官方解析')
+    expect(wrapper.text()).toContain('教师补充解析')
   })
 })

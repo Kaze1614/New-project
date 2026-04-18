@@ -3,21 +3,16 @@
     <span>AI</span>
   </button>
 
-  <aside class="ai-drawer" :class="{ open: uiStore.aiDrawerOpen }" aria-label="AI 助理对话抽屉">
+  <aside class="ai-drawer" :class="{ open: uiStore.aiDrawerOpen }" aria-label="AI 助手对话抽屉">
     <header class="ai-drawer-head">
-      <h3>AI 辅导员</h3>
+      <h3>AI 导师</h3>
       <button class="icon-btn" type="button" aria-label="关闭" @click="uiStore.closeAIDrawer()">×</button>
     </header>
 
-    <div v-if="!authStore.isLoggedIn" class="ai-empty">
-      <p>登录后可使用 AI 答疑</p>
-      <RouterLink class="outline-btn" to="/login">去登录</RouterLink>
-    </div>
-
-    <template v-else>
+    <template v-if="authStore.isLoggedIn">
       <p v-if="pendingContext" class="context-tip">已携带当前题目上下文，发送消息时将自动注入。</p>
 
-      <div class="ai-messages">
+      <div class="ai-messages ai-body">
         <p v-if="loadingMessages" class="muted">加载会话中...</p>
         <p v-else-if="!messages.length" class="muted">输入问题后开始答疑。</p>
         <article
@@ -30,7 +25,7 @@
         </article>
       </div>
 
-      <form class="ai-form" @submit.prevent="sendMessage">
+      <form class="ai-form ai-footer" @submit.prevent="sendMessage">
         <input
           v-model.trim="draft"
           type="text"
@@ -42,16 +37,24 @@
         </button>
       </form>
     </template>
+
+    <div v-else class="ai-body ai-guest-state">
+      <div class="ai-guest-card">
+        <p>欢迎来到数学园！AI 导师已就绪。请先登录以开启智能答疑并保存您的专属学习记录。</p>
+        <button class="primary-btn" type="button" @click="goLogin">前往登录</button>
+      </div>
+    </div>
   </aside>
 </template>
 
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { RouterLink } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { api, unwrap } from '../api/client'
 import { useAuthStore } from '../stores/auth'
 import { useUiStore } from '../stores/ui'
 
+const router = useRouter()
 const authStore = useAuthStore()
 const uiStore = useUiStore()
 
@@ -73,14 +76,19 @@ watch(isOpen, async (open) => {
 watch(
   () => uiStore.aiPendingContext,
   (value) => {
-    if (uiStore.aiDrawerOpen && value) {
+    if (uiStore.aiDrawerOpen && authStore.isLoggedIn && value) {
       pendingContext.value = value
     }
   }
 )
 
-async function openDrawer() {
+function openDrawer() {
   uiStore.openAIDrawer()
+}
+
+function goLogin() {
+  uiStore.closeAIDrawer()
+  router.push('/login')
 }
 
 async function ensureSession() {

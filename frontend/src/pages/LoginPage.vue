@@ -2,7 +2,7 @@
   <section class="auth-wrapper">
     <div class="auth-card-v2">
       <h2>数学园</h2>
-      <p class="muted">默认管理员账号：admin / 123456</p>
+      <p class="muted">注册账号后即可进入个人学习空间。</p>
 
       <div class="auth-tabs">
         <button :class="{ active: mode === 'login' }" type="button" @click="mode = 'login'">登录</button>
@@ -17,7 +17,7 @@
             type="text"
             minlength="3"
             maxlength="32"
-            autocomplete="off"
+            autocomplete="username"
             required
             placeholder="请输入账号"
           />
@@ -29,6 +29,7 @@
             type="password"
             minlength="6"
             maxlength="64"
+            autocomplete="current-password"
             required
             placeholder="请输入密码"
           />

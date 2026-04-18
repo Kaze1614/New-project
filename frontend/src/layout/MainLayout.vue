@@ -1,5 +1,5 @@
 <template>
-  <div class="app-shell" @click="handleShellClick">
+  <div class="app-shell">
     <SidebarNav />
     <div class="app-main">
       <TopBar />
@@ -15,13 +15,4 @@
 import SidebarNav from '../components/SidebarNav.vue'
 import TopBar from '../components/TopBar.vue'
 import AIAssistantDrawer from '../components/AIAssistantDrawer.vue'
-import { useUiStore } from '../stores/ui'
-
-const uiStore = useUiStore()
-
-function handleShellClick() {
-  if (uiStore.chapterFlyoutOpen) {
-    uiStore.setChapterFlyoutOpen(false)
-  }
-}
 </script>

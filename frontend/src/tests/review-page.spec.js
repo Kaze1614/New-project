@@ -15,7 +15,11 @@ vi.mock('../api/client', () => {
           questionContent: '已知 f(x)=x^2，求导数',
           dueDate: new Date().toISOString(),
           officialAnswer: '2x',
-          officialExplanation: '幂函数求导法则'
+          officialExplanation: '幂函数求导法则',
+          explanationSource: 'TEACHER_GENERATED',
+          explanationReviewStatus: 'PENDING_REVIEW',
+          sourceLabel: '1.(2025)(全国I卷)',
+          sourceSnapshotPath: null
         })
       }
       return Promise.resolve(null)
@@ -31,7 +35,7 @@ vi.mock('../api/client', () => {
 import ReviewPage from '../pages/ReviewPage.vue'
 
 describe('ReviewPage', () => {
-  it('supports blind -> reveal -> rate state flow', async () => {
+  it('supports blind -> reveal -> rate state flow with explanation source', async () => {
     const wrapper = mount(ReviewPage, {
       global: {
         plugins: [createPinia()]
@@ -41,7 +45,8 @@ describe('ReviewPage', () => {
 
     expect(wrapper.text()).toContain('查看标准解析')
     await wrapper.find('.primary-btn').trigger('click')
-    expect(wrapper.text()).toContain('官方解析')
+    expect(wrapper.text()).toContain('教师补充解析')
+    expect(wrapper.text()).toContain('1.(2025)(全国I卷)')
 
     const rateButtons = wrapper.findAll('.rating')
     expect(rateButtons).toHaveLength(3)
