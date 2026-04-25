@@ -4,15 +4,12 @@
       <h2>前去复习</h2>
     </header>
 
-    <div v-if="reviewStore.loading" class="panel-card">正在加载到期复习任务...</div>
-    <div v-else-if="!reviewStore.hasTasks" class="panel-card">
-      今日没有到期错题，可以先回到刷题页继续训练。
-    </div>
+    <div v-if="reviewStore.loading" class="panel-card">正在加载待复习题库...</div>
+    <div v-else-if="!reviewStore.hasTasks" class="panel-card">当前没有待复习题目，可以先回到刷题页继续训练。</div>
     <div v-else class="study-layout">
       <article class="study-main">
         <div class="question-meta">
           <p class="question-index">第 {{ currentIndex + 1 }} / {{ reviewStore.tasks.length }} 题</p>
-          <span class="source-pill">Box {{ currentTask.repetition }}</span>
           <span v-if="currentTask.sourceLabel" class="source-pill">{{ currentTask.sourceLabel }}</span>
         </div>
 
@@ -163,7 +160,7 @@ onMounted(async () => {
     startedAt.value = Date.now()
     tick.value = Date.now()
   } catch (error) {
-    actionError.value = error?.response?.data?.message || '加载复习任务失败，请稍后重试'
+    actionError.value = error?.response?.data?.message || '加载待复习题库失败，请稍后重试'
   }
 
   timer = window.setInterval(() => {
@@ -247,14 +244,14 @@ async function submitReview() {
 
 function resultLabel(result) {
   if (result.removedFromMistakes) {
-    return '已完成 Box 3，本题已移出错题本'
+    return '本题已完成复习，已从错题本移出'
   }
   if (!result.answered) {
-    return `未作答，保留在 Box ${result.nextBox}`
+    return '未作答，本题保留在待复习题库'
   }
   if (result.correct) {
-    return `回答正确，进入 Box ${result.nextBox}`
+    return '回答正确，已进入下一轮复习'
   }
-  return `回答错误，回到 Box ${result.nextBox}`
+  return '回答错误，已重新进入当前复习队列'
 }
 </script>

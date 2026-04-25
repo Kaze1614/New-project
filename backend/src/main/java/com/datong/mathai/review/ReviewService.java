@@ -175,13 +175,18 @@ public class ReviewService {
         double nextEaseFactor = row.easeFactor();
 
         if (!correct) {
+            int nextBox = currentBox == BOX_THREE ? BOX_TWO : BOX_ONE;
+            int intervalDays = nextBox == BOX_TWO ? 3 : 0;
+            LocalDateTime nextDueDate = nextBox == BOX_TWO ? now.plusDays(3) : now;
             jdbcTemplate.update(
                 """
                     UPDATE review_tasks
-                    SET due_date = ?, completed = 0, suspended = 0, repetition = 1, interval_days = 1, ease_factor = ?, last_grade = ?, completed_at = NULL, updated_at = ?
+                    SET due_date = ?, completed = 0, suspended = 0, repetition = ?, interval_days = ?, ease_factor = ?, last_grade = ?, completed_at = NULL, updated_at = ?
                     WHERE id = ? AND user_id = ?
                     """,
-                Timestamp.valueOf(now.plusDays(1)),
+                Timestamp.valueOf(nextDueDate),
+                nextBox,
+                intervalDays,
                 nextEaseFactor,
                 gradeLabel,
                 Timestamp.valueOf(now),
@@ -194,7 +199,7 @@ public class ReviewService {
                 row.mistakeId(),
                 userId
             );
-            return new TransitionResult(BOX_ONE, false);
+            return new TransitionResult(nextBox, false);
         }
 
         if (currentBox == BOX_THREE && removeWhenCompleted) {

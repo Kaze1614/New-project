@@ -40,10 +40,17 @@ class ReviewSchedulingTest {
     private JdbcTemplate jdbcTemplate;
 
     @Test
-    void reviewTaskShouldFollowLeitnerBoxes() throws Exception {
+    void reviewTaskShouldCreateImmediatelyDueAndFollowLeitnerBoxes() throws Exception {
         String username = "review_" + System.currentTimeMillis();
         String token = registerAndGetToken(username);
         long taskId = createReviewTasksByStudySubmit(token, 1).get(0);
+
+        Timestamp dueDate = jdbcTemplate.queryForObject(
+            "SELECT due_date FROM review_tasks WHERE id = ?",
+            Timestamp.class,
+            taskId
+        );
+        assertTrue(dueDate.toLocalDateTime().isBefore(LocalDateTime.now().plusSeconds(1)));
 
         mockMvc.perform(post("/api/review/tasks/{id}/rate", taskId)
                 .header("Authorization", "Bearer " + token)
@@ -52,9 +59,7 @@ class ReviewSchedulingTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.lastGrade").value("HARD"))
             .andExpect(jsonPath("$.data.repetition").value(2))
-            .andExpect(jsonPath("$.data.intervalDays").value(3))
-            .andExpect(jsonPath("$.data.completed").value(false))
-            .andExpect(jsonPath("$.data.suspended").value(false));
+            .andExpect(jsonPath("$.data.intervalDays").value(3));
 
         mockMvc.perform(post("/api/review/tasks/{id}/rate", taskId)
                 .header("Authorization", "Bearer " + token)
@@ -63,9 +68,7 @@ class ReviewSchedulingTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.lastGrade").value("EASY"))
             .andExpect(jsonPath("$.data.repetition").value(3))
-            .andExpect(jsonPath("$.data.intervalDays").value(7))
-            .andExpect(jsonPath("$.data.completed").value(false))
-            .andExpect(jsonPath("$.data.suspended").value(false));
+            .andExpect(jsonPath("$.data.intervalDays").value(7));
 
         mockMvc.perform(post("/api/review/tasks/{id}/rate", taskId)
                 .header("Authorization", "Bearer " + token)
@@ -73,10 +76,23 @@ class ReviewSchedulingTest {
                 .content(objectMapper.writeValueAsString(Map.of("grade", "again"))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.lastGrade").value("AGAIN"))
+            .andExpect(jsonPath("$.data.repetition").value(2))
+            .andExpect(jsonPath("$.data.intervalDays").value(3));
+
+        mockMvc.perform(post("/api/review/tasks/{id}/rate", taskId)
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("grade", "again"))))
+            .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.repetition").value(1))
-            .andExpect(jsonPath("$.data.intervalDays").value(1))
-            .andExpect(jsonPath("$.data.completed").value(false))
-            .andExpect(jsonPath("$.data.suspended").value(false));
+            .andExpect(jsonPath("$.data.intervalDays").value(0));
+
+        Timestamp resetDueDate = jdbcTemplate.queryForObject(
+            "SELECT due_date FROM review_tasks WHERE id = ?",
+            Timestamp.class,
+            taskId
+        );
+        assertTrue(resetDueDate.toLocalDateTime().isBefore(LocalDateTime.now().plusSeconds(1)));
 
         mockMvc.perform(post("/api/review/tasks/{id}/rate", taskId)
                 .header("Authorization", "Bearer " + token)
@@ -114,7 +130,6 @@ class ReviewSchedulingTest {
         String username = "review_submit_" + System.currentTimeMillis();
         String token = registerAndGetToken(username);
         List<Long> taskIds = createReviewTasksByStudySubmit(token, 2);
-        markTasksDue(taskIds);
 
         MvcResult dueResult = mockMvc.perform(get("/api/review/tasks")
                 .header("Authorization", "Bearer " + token)
@@ -218,8 +233,9 @@ class ReviewSchedulingTest {
             .andExpect(status().isOk())
             .andReturn();
 
-        JsonNode items = objectMapper.readTree(sessionResult.getResponse().getContentAsString()).path("data").path("items");
-        long sessionId = objectMapper.readTree(sessionResult.getResponse().getContentAsString()).path("data").path("id").asLong();
+        JsonNode responseBody = objectMapper.readTree(sessionResult.getResponse().getContentAsString()).path("data");
+        JsonNode items = responseBody.path("items");
+        long sessionId = responseBody.path("id").asLong();
 
         for (int i = 0; i < wrongCount; i++) {
             long itemId = items.get(i).path("itemId").asLong();
@@ -249,15 +265,5 @@ class ReviewSchedulingTest {
         }
         assertTrue(taskIds.size() >= wrongCount);
         return taskIds;
-    }
-
-    private void markTasksDue(List<Long> taskIds) {
-        for (Long taskId : taskIds) {
-            jdbcTemplate.update(
-                "UPDATE review_tasks SET due_date = ?, repetition = 1, interval_days = 1 WHERE id = ?",
-                Timestamp.valueOf(LocalDateTime.now().minusMinutes(5)),
-                taskId
-            );
-        }
     }
 }
