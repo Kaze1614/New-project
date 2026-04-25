@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class MistakeService {
@@ -35,8 +36,10 @@ public class MistakeService {
     public List<MistakeItem> list(Long userId, Long chapterId, String difficulty, String keyword) {
         StringBuilder sql = new StringBuilder("""
             SELECT m.id, m.question_id, m.chapter_id, m.difficulty, m.question_title, m.question_content, m.image_url, m.status, m.created_at, m.updated_at,
+                   q.type AS question_type, q.options_json, q.answer_json, q.explanation, q.source_label,
                    a.error_type, a.knowledge_points_json, a.solving_steps_json, a.variants_json, a.follow_up_json
             FROM mistake_records m
+            LEFT JOIN questions q ON m.question_id = q.id
             LEFT JOIN mistake_analysis a ON m.id = a.mistake_id
             WHERE m.user_id = ?
             """);
@@ -80,6 +83,11 @@ public class MistakeService {
                 rs.getString("question_content"),
                 rs.getString("image_url"),
                 rs.getString("status"),
+                rs.getString("question_type"),
+                parseList(rs.getString("options_json")),
+                stringifyAnswer(rs.getString("answer_json")),
+                rs.getString("explanation"),
+                rs.getString("source_label"),
                 rs.getTimestamp("created_at").toLocalDateTime(),
                 rs.getTimestamp("updated_at").toLocalDateTime(),
                 analysisView
@@ -113,7 +121,7 @@ public class MistakeService {
         }, keyHolder);
 
         Long id = extractId(keyHolder, "Create mistake failed");
-        return new MistakeItem(id, null, request.chapterId(), null, request.questionTitle(), request.questionContent(), request.imageUrl(), "NEW", now, now, null);
+        return new MistakeItem(id, null, request.chapterId(), null, request.questionTitle(), request.questionContent(), request.imageUrl(), "NEW", null, Collections.emptyList(), null, null, null, now, now, null);
     }
 
     public void delete(Long userId, Long id) {
@@ -247,6 +255,17 @@ public class MistakeService {
         } catch (Exception ex) {
             return Collections.emptyList();
         }
+    }
+
+    private String stringifyAnswer(String raw) {
+        List<String> answers = parseList(raw);
+        if (answers.isEmpty()) {
+            return null;
+        }
+        return answers.stream()
+            .map(String::trim)
+            .filter(item -> !item.isBlank())
+            .collect(Collectors.joining(", "));
     }
 
     private record MistakeRow(Long id, String title, String content) {

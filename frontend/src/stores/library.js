@@ -16,9 +16,25 @@ export const useLibraryStore = defineStore('library', {
     favorites: [],
     loadingMistakes: false,
     loadingFavorites: false,
-    mistakeFilters: { keyword: '' },
-    favoriteFilters: { keyword: '' }
+    mistakeFilters: { keyword: '', chapterId: null },
+    favoriteFilters: { keyword: '' },
+    selectedMistakeId: null,
+    selectedMistakeAnswer: '',
+    revealedMistakeId: null,
+    selectedChapterId: null
   }),
+  getters: {
+    activeMistake(state) {
+      if (!state.mistakes.length) return null
+      return state.mistakes.find((item) => item.id === state.selectedMistakeId) ?? state.mistakes[0]
+    },
+    canCheckActiveMistake() {
+      return this.activeMistake?.questionType === 'SINGLE' && Array.isArray(this.activeMistake?.options) && this.activeMistake.options.length > 0
+    },
+    isAnswerRevealed() {
+      return this.activeMistake && this.revealedMistakeId === this.activeMistake.id
+    }
+  },
   actions: {
     async loadMistakes() {
       this.loadingMistakes = true
@@ -26,6 +42,14 @@ export const useLibraryStore = defineStore('library', {
         this.mistakes = await unwrap(
           api.get('/mistakes', { params: cleanParams(this.mistakeFilters) })
         )
+        if (!this.mistakes.length) {
+          this.resetMistakeUi()
+          return this.mistakes
+        }
+        const stillExists = this.mistakes.some((item) => item.id === this.selectedMistakeId)
+        if (!stillExists) {
+          this.selectMistake(this.mistakes[0].id)
+        }
       } finally {
         this.loadingMistakes = false
       }
@@ -41,6 +65,27 @@ export const useLibraryStore = defineStore('library', {
         this.loadingFavorites = false
       }
       return this.favorites
+    },
+    selectMistake(id) {
+      this.selectedMistakeId = id
+      this.selectedMistakeAnswer = ''
+      this.revealedMistakeId = null
+    },
+    setMistakeAnswer(answer) {
+      this.selectedMistakeAnswer = answer
+    },
+    revealActiveMistake() {
+      if (!this.activeMistake) return
+      this.revealedMistakeId = this.activeMistake.id
+    },
+    setSelectedChapter(id) {
+      this.selectedChapterId = id
+      this.mistakeFilters = { ...this.mistakeFilters, chapterId: id }
+    },
+    resetMistakeUi() {
+      this.selectedMistakeId = null
+      this.selectedMistakeAnswer = ''
+      this.revealedMistakeId = null
     }
   }
 })

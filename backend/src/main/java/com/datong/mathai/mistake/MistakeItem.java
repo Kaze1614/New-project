@@ -11,6 +11,11 @@ public record MistakeItem(
     String questionContent,
     String imageUrl,
     String status,
+    String questionType,
+    java.util.List<String> options,
+    String correctAnswer,
+    String explanation,
+    String sourceLabel,
     LocalDateTime createdAt,
     LocalDateTime updatedAt,
     MistakeAnalysisView analysis
