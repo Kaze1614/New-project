@@ -1,20 +1,28 @@
 <template>
   <div class="admin-shell">
     <aside class="admin-rail">
-      <RouterLink class="admin-brand" to="/dashboard" aria-label="返回学生端首页">
+      <RouterLink class="admin-brand" to="/admin/questions" aria-label="返回题目管理">
         <span class="admin-brand-mark">M</span>
         <span>
           <strong>数学园后台</strong>
-          <small>题库录入工作台</small>
+          <small>题库管理工作台</small>
         </span>
       </RouterLink>
 
       <nav class="admin-nav" aria-label="后台导航">
-        <RouterLink class="admin-nav-item" to="/admin/questions/new">
+        <RouterLink class="admin-nav-item" to="/admin/questions">
           <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M12 5v14M5 12h14"></path>
+            <path d="M4 6h16M4 12h16M4 18h10"></path>
           </svg>
-          新增题目
+          题目管理
+        </RouterLink>
+        <RouterLink class="admin-nav-item" to="/admin/users">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+            <circle cx="10" cy="7" r="4"></circle>
+            <path d="M20 8v6M17 11h6"></path>
+          </svg>
+          用户管理
         </RouterLink>
         <RouterLink class="admin-nav-item" to="/dashboard">
           <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -29,8 +37,8 @@
     <div class="admin-main">
       <header class="admin-topbar">
         <div>
-          <p class="admin-kicker">数学园后台 &gt; 题目管理 &gt; 新增/编辑题目</p>
-          <h1>题目录入</h1>
+          <p class="admin-kicker">数学园后台 &gt; {{ adminCrumb }}</p>
+          <h1>{{ adminTitle }}</h1>
         </div>
         <div class="admin-topbar-actions">
           <RouterLink class="outline-btn" to="/dashboard">返回学生端</RouterLink>
@@ -46,11 +54,16 @@
 </template>
 
 <script setup>
-import { RouterLink, useRouter } from 'vue-router'
+import { computed } from 'vue'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 
+const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+
+const adminTitle = computed(() => route.meta.adminTitle || '题目管理')
+const adminCrumb = computed(() => route.meta.adminCrumb || '题目管理')
 
 function logout() {
   authStore.logout()

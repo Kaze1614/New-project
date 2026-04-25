@@ -3,10 +3,65 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title></title>
+    <title>数学园</title>
+    <style>
+      body.appflow-hidden [id*="appflow" i],
+      body.appflow-hidden [class*="appflow" i],
+      body.appflow-hidden [id*="chatbot" i],
+      body.appflow-hidden [class*="chatbot" i],
+      body.appflow-hidden iframe[src*="appflow" i],
+      body.appflow-hidden iframe[src*="aliyunnest" i],
+      body.appflow-hidden iframe[src*="alicdn" i] {
+        display: none !important;
+        pointer-events: none !important;
+        visibility: hidden !important;
+      }
+    </style>
   </head>
   <body>
     <div id="app"></div>
     <script type="module" src="/src/main.js"></script>
+    <script src="https://o.alicdn.com/appflow/chatbot/v1/AppflowChatSDK.js"></script>
+    <script>
+      const appflowHiddenPathPatterns = [/^\/login(?:\/|$)/, /^\/admin(?:\/|$)/];
+
+      function shouldHideAppflow() {
+        return appflowHiddenPathPatterns.some((pattern) => pattern.test(window.location.pathname));
+      }
+
+      function syncAppflowVisibility() {
+        document.body.classList.toggle('appflow-hidden', shouldHideAppflow());
+      }
+
+      const rawPushState = history.pushState;
+      const rawReplaceState = history.replaceState;
+
+      history.pushState = function pushState(...args) {
+        const result = rawPushState.apply(this, args);
+        window.dispatchEvent(new Event('appflow-route-change'));
+        return result;
+      };
+
+      history.replaceState = function replaceState(...args) {
+        const result = rawReplaceState.apply(this, args);
+        window.dispatchEvent(new Event('appflow-route-change'));
+        return result;
+      };
+
+      window.addEventListener('popstate', syncAppflowVisibility);
+      window.addEventListener('appflow-route-change', syncAppflowVisibility);
+      window.addEventListener('DOMContentLoaded', syncAppflowVisibility);
+
+      window.APPFLOW_CHAT_SDK?.init({
+        integrateConfig: {
+          integrateId: 'cit-90f70418026b48a69b02',
+          domain: {
+            requestDomain: 'https://1413176655504465.appflow.aliyunnest.com'
+          }
+        }
+      });
+
+      syncAppflowVisibility();
+    </script>
   </body>
 </html>

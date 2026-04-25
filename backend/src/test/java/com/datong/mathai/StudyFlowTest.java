@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -30,8 +31,12 @@ class StudyFlowTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     @Test
     void studySubmitShouldWriteMistakeAndReviewTask() throws Exception {
+        insertMathQuestion(9002);
         String username = "study_" + System.currentTimeMillis();
         String token = registerAndGetToken(username);
 
@@ -73,7 +78,7 @@ class StudyFlowTest {
         mockMvc.perform(get("/api/dashboard/overview")
                 .header("Authorization", "Bearer " + token))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.questionBankTotal").value(20))
+            .andExpect(jsonPath("$.data.questionBankTotal").value(1))
             .andExpect(jsonPath("$.data.totalMistakes").value(1))
             .andExpect(jsonPath("$.data.pendingReview").value(1));
     }
@@ -91,5 +96,27 @@ class StudyFlowTest {
             .path("data")
             .path("token")
             .asText();
+    }
+
+    private void insertMathQuestion(int questionNo) {
+        jdbcTemplate.update("DELETE FROM math_questions");
+        jdbcTemplate.update(
+            """
+                INSERT INTO math_questions(
+                    image_url, raw_text_latex, answer_latex, teacher_explanation,
+                    book_name, chapter_name, section_name, source_year, source_paper, question_no
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+            null,
+            questionNo + ".(2025)(全国I卷) 已知集合 B={3,4}",
+            "B",
+            "教师补充解析：根据题意直接判断。",
+            "必修第一册",
+            "第一章 集合与常用逻辑用语",
+            "1.1 集合的概念",
+            2025,
+            "全国I卷",
+            questionNo
+        );
     }
 }

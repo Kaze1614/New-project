@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS users (
   username VARCHAR(32) NOT NULL UNIQUE,
   password_hash VARCHAR(128) NOT NULL,
   display_name VARCHAR(32) NOT NULL,
+  role VARCHAR(24) NOT NULL DEFAULT 'STUDENT',
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -22,11 +23,39 @@ CREATE TABLE IF NOT EXISTS questions (
   content TEXT NOT NULL,
   type VARCHAR(24) NOT NULL DEFAULT 'FILL',
   options_json TEXT NULL,
-  answer_json TEXT NOT NULL DEFAULT '[]',
-  explanation TEXT NOT NULL DEFAULT '',
+  answer_json TEXT NULL,
+  explanation TEXT NULL,
   difficulty VARCHAR(24) NOT NULL DEFAULT 'MEDIUM',
+  source_year INT NULL,
+  source_paper VARCHAR(80) NULL,
+  source_question_no VARCHAR(24) NULL,
+  source_label VARCHAR(120) NULL,
+  source_doc_path VARCHAR(1024) NULL,
+  source_snapshot_path VARCHAR(1024) NULL,
+  exam_section VARCHAR(40) NULL,
+  import_batch VARCHAR(80) NULL,
+  import_status VARCHAR(40) NOT NULL DEFAULT 'READY',
+  classification_confidence DECIMAL(5,2) NULL,
+  explanation_source VARCHAR(40) NOT NULL DEFAULT 'NONE',
+  explanation_review_status VARCHAR(40) NOT NULL DEFAULT 'PENDING_REVIEW',
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_question_chapter FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS math_questions (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  image_url VARCHAR(1024) NULL,
+  raw_text_latex LONGTEXT NOT NULL,
+  answer_latex TEXT NULL,
+  teacher_explanation LONGTEXT NULL,
+  book_name VARCHAR(120) NOT NULL,
+  chapter_name VARCHAR(160) NOT NULL,
+  section_name VARCHAR(180) NOT NULL,
+  source_year INT NULL,
+  source_paper VARCHAR(80) NULL,
+  question_no INT NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS mistake_records (
@@ -138,6 +167,10 @@ CREATE INDEX idx_review_user ON review_tasks(user_id);
 CREATE INDEX idx_review_due ON review_tasks(user_id, due_date);
 CREATE INDEX idx_favorite_user ON favorites(user_id);
 CREATE INDEX idx_question_chapter ON questions(chapter_id);
+CREATE INDEX idx_question_source ON questions(source_year, source_paper, source_question_no);
+CREATE INDEX idx_question_import_batch ON questions(import_batch);
+CREATE INDEX idx_math_question_source ON math_questions(source_year, source_paper, question_no);
+CREATE INDEX idx_math_question_section ON math_questions(book_name, chapter_name, section_name);
 CREATE INDEX idx_qa_session_user ON qa_sessions(user_id);
 CREATE INDEX idx_study_session_user ON study_sessions(user_id);
 CREATE INDEX idx_study_item_session ON study_session_items(session_id);

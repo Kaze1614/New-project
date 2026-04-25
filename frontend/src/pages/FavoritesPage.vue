@@ -2,18 +2,11 @@
   <section class="library-page">
     <header class="library-head">
       <h2>收藏本</h2>
-      <p>按章节和难度快速回看高价值题目。</p>
+      <p>用关键词回看已收藏题目。</p>
     </header>
 
     <form class="filter-bar" @submit.prevent="applyFilters">
       <input v-model.trim="filters.keyword" type="text" placeholder="关键词搜索题干" />
-      <input v-model.trim="filters.chapterId" type="number" min="1" placeholder="章节ID" />
-      <select v-model="filters.difficulty">
-        <option value="">全部难度</option>
-        <option value="EASY">简单</option>
-        <option value="MEDIUM">中等</option>
-        <option value="HARD">困难</option>
-      </select>
       <button class="primary-btn" type="submit">筛选</button>
     </form>
 
@@ -43,8 +36,6 @@ import { useLibraryStore } from '../stores/library'
 
 const libraryStore = useLibraryStore()
 const filters = reactive({
-  chapterId: '',
-  difficulty: '',
   keyword: ''
 })
 

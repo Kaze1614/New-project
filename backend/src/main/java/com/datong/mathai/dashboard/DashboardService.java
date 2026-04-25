@@ -16,7 +16,7 @@ public class DashboardService {
     }
 
     public DashboardOverview overview(Long userId) {
-        int questionBankTotal = queryInt("SELECT COUNT(1) FROM questions");
+        int questionBankTotal = queryInt("SELECT COUNT(1) FROM math_questions");
         int totalMistakes = queryInt("SELECT COUNT(1) FROM mistake_records WHERE user_id = ?", userId);
         int mastered = queryInt("SELECT COUNT(1) FROM mistake_records WHERE user_id = ? AND status = 'MASTERED'", userId);
         int pendingReview = queryInt("SELECT COUNT(1) FROM review_tasks WHERE user_id = ? AND completed = 0 AND suspended = 0", userId);
@@ -45,7 +45,6 @@ public class DashboardService {
         );
         double accuracyRate = totalSolved == 0 ? 0d : (correctSolved * 100.0 / totalSolved);
 
-        String weakSpotHint = queryWeakSpotHint(userId);
         return new DashboardOverview(
             questionBankTotal,
             totalMistakes,
@@ -55,7 +54,7 @@ public class DashboardService {
             totalSolved,
             Math.round(accuracyRate * 100.0) / 100.0,
             criticalReviewCount,
-            weakSpotHint
+            queryWeakSpotHint(userId)
         );
     }
 
@@ -87,6 +86,6 @@ public class DashboardService {
         if (!rows.isEmpty()) {
             return rows.get(0);
         }
-        return "今日记录 " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("MM-dd")) + "，继续保持";
+        return "今日记录 " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("MM-dd")) + "，继续保持。";
     }
 }

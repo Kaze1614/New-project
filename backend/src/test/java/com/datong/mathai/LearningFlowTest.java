@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -29,8 +30,12 @@ class LearningFlowTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     @Test
     void registerToAnalyzeToReviewToDashboardShouldWork() throws Exception {
+        insertMathQuestion(9001);
         String username = "flow_" + System.currentTimeMillis();
 
         MvcResult registerResult = mockMvc.perform(post("/api/auth/register")
@@ -85,7 +90,7 @@ class LearningFlowTest {
         mockMvc.perform(get("/api/dashboard/overview")
                 .header("Authorization", "Bearer " + token))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.questionBankTotal").value(20))
+            .andExpect(jsonPath("$.data.questionBankTotal").value(1))
             .andExpect(jsonPath("$.data.totalMistakes").value(1))
             .andExpect(jsonPath("$.data.mastered").value(1));
 
@@ -95,5 +100,27 @@ class LearningFlowTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.questions").isArray())
             .andExpect(jsonPath("$.data.mistakes").isArray());
+    }
+
+    private void insertMathQuestion(int questionNo) {
+        jdbcTemplate.update("DELETE FROM math_questions");
+        jdbcTemplate.update(
+            """
+                INSERT INTO math_questions(
+                    image_url, raw_text_latex, answer_latex, teacher_explanation,
+                    book_name, chapter_name, section_name, source_year, source_paper, question_no
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+            null,
+            questionNo + ".(2025)(全国I卷) 已知集合 A={1,2}",
+            "A",
+            "教师补充解析：直接根据集合元素判断。",
+            "必修第一册",
+            "第一章 集合与常用逻辑用语",
+            "1.1 集合的概念",
+            2025,
+            "全国I卷",
+            questionNo
+        );
     }
 }

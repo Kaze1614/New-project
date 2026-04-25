@@ -10,7 +10,9 @@ import MistakesPage from '../pages/MistakesPage.vue'
 import FavoritesPage from '../pages/FavoritesPage.vue'
 import ReviewPage from '../pages/ReviewPage.vue'
 import ChaptersPage from '../pages/ChaptersPage.vue'
+import QuestionListPage from '../pages/QuestionListPage.vue'
 import QuestionEditorPage from '../pages/QuestionEditorPage.vue'
+import UserManagementPage from '../pages/UserManagementPage.vue'
 
 const routes = [
   { path: '/login', name: 'login', component: LoginPage },
@@ -31,8 +33,11 @@ const routes = [
     path: '/admin',
     component: AdminLayout,
     children: [
-      { path: '', redirect: '/admin/questions/new' },
-      { path: 'questions/new', name: 'admin-question-new', component: QuestionEditorPage }
+      { path: '', redirect: '/admin/questions' },
+      { path: 'questions', name: 'admin-question-list', component: QuestionListPage, meta: { adminTitle: '题目管理', adminCrumb: '题目管理' } },
+      { path: 'questions/new', name: 'admin-question-new', component: QuestionEditorPage, meta: { adminTitle: '新增题目', adminCrumb: '题目管理 > 新增题目' } },
+      { path: 'questions/:id/edit', name: 'admin-question-edit', component: QuestionEditorPage, meta: { adminTitle: '编辑题目', adminCrumb: '题目管理 > 编辑题目' } },
+      { path: 'users', name: 'admin-user-list', component: UserManagementPage, meta: { adminTitle: '用户管理', adminCrumb: '用户管理' } }
     ]
   },
   { path: '/:pathMatch(.*)*', redirect: '/dashboard' }

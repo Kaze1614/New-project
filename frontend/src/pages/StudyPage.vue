@@ -57,9 +57,6 @@
           <p v-if="currentItem.explanationReviewStatus === 'PENDING_REVIEW'" class="review-warning">
             该解析为教师补充解析或题面含公式图片，建议人工复核后用于正式练习。
           </p>
-          <button class="ghost-btn" type="button" @click="askAIForCurrent">
-            💡 没看懂解析？
-          </button>
         </div>
 
         <footer class="study-actions">
@@ -113,11 +110,9 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useStudyStore } from '../stores/study'
-import { useUiStore } from '../stores/ui'
 
 const route = useRoute()
 const studyStore = useStudyStore()
-const uiStore = useUiStore()
 
 const currentIndex = ref(0)
 const fillDraft = ref('')
@@ -225,14 +220,4 @@ function explanationTitle(item) {
   return item?.explanationSource === 'TEACHER_GENERATED' ? '教师补充解析' : '官方解析'
 }
 
-function askAIForCurrent() {
-  if (!currentItem.value) return
-  const context = [
-    `出处：${currentItem.value.sourceLabel || '题库题目'}`,
-    `题目：${currentItem.value.content}`,
-    `标准答案：${currentItem.value.officialAnswer || '暂无'}`,
-    `${explanationTitle(currentItem.value)}：${currentItem.value.officialExplanation || '暂无'}`,
-  ].join('\n')
-  uiStore.openAIDrawer(context)
-}
 </script>

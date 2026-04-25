@@ -2,23 +2,52 @@
   <section class="chapters-page">
     <header class="library-head">
       <h2>章节目录</h2>
-      <p>点击章节可直接进入 20 题学习会话。</p>
+      <p>按“册 - 章 - 节”浏览高中数学目录，点击具体小节直接进入对应题组。</p>
     </header>
 
     <article class="panel-card chapter-tree-card">
-      <h3>章节树</h3>
-      <ul class="chapter-tree">
-        <li v-for="root in chapters" :key="root.id">
-          <p class="chapter-title">{{ root.title }}</p>
-          <ul>
-            <li v-for="node in root.children || []" :key="node.id">
-              <button class="chapter-button" type="button" @click="goStudy(node.id)">
-                {{ node.title }}
+      <div class="chapter-tree-head">
+        <div>
+          <p class="section-eyebrow">CATALOG</p>
+          <h3>高中数学章节树</h3>
+        </div>
+      </div>
+
+      <p v-if="loading" class="muted">章节加载中...</p>
+      <p v-else-if="loadError" class="error-text">{{ loadError }}</p>
+
+      <ul v-else class="chapter-tree collapsible-tree">
+        <li v-for="book in chapters" :key="book.id" class="book-node">
+          <button
+            class="tree-toggle book-toggle"
+            type="button"
+            :aria-expanded="isBookExpanded(book.id)"
+            @click="toggleBook(book.id)"
+          >
+            <span class="tree-caret" :class="{ expanded: isBookExpanded(book.id) }" aria-hidden="true">
+              <svg viewBox="0 0 16 16"><path d="M5.5 3.5 10 8l-4.5 4.5" /></svg>
+            </span>
+            <span>{{ book.title }}</span>
+          </button>
+
+          <ul v-if="isBookExpanded(book.id)" class="chapter-branch">
+            <li v-for="chapter in book.children || []" :key="chapter.id" class="chapter-node">
+              <button
+                class="tree-toggle chapter-toggle"
+                type="button"
+                :aria-expanded="isChapterExpanded(chapter.id)"
+                @click="toggleChapter(chapter.id)"
+              >
+                <span class="tree-caret" :class="{ expanded: isChapterExpanded(chapter.id) }" aria-hidden="true">
+                  <svg viewBox="0 0 16 16"><path d="M5.5 3.5 10 8l-4.5 4.5" /></svg>
+                </span>
+                <span>{{ chapter.title }}</span>
               </button>
-              <ul>
-                <li v-for="leaf in node.children || []" :key="leaf.id">
-                  <button class="chapter-leaf" type="button" @click="goStudy(leaf.id)">
-                    {{ leaf.title }}
+
+              <ul v-if="isChapterExpanded(chapter.id)" class="section-branch">
+                <li v-for="section in chapter.children || []" :key="section.id">
+                  <button class="section-link" type="button" @click="goStudy(section.id)">
+                    <span>{{ section.title }}</span>
                   </button>
                 </li>
               </ul>
@@ -50,6 +79,10 @@ const route = useRoute()
 const router = useRouter()
 
 const chapters = ref([])
+const loading = ref(false)
+const loadError = ref('')
+const expandedBooks = ref(new Set())
+const expandedChapters = ref(new Set())
 const searchLoading = ref(false)
 const searchKeyword = ref('')
 const searchResults = reactive({
@@ -58,9 +91,7 @@ const searchResults = reactive({
   mistakes: []
 })
 
-onMounted(async () => {
-  chapters.value = await unwrap(api.get('/chapters/tree'))
-})
+onMounted(loadChapters)
 
 watch(
   () => route.query.keyword,
@@ -84,6 +115,52 @@ watch(
   },
   { immediate: true }
 )
+
+async function loadChapters() {
+  loading.value = true
+  loadError.value = ''
+  try {
+    chapters.value = await unwrap(api.get('/chapters/tree'))
+    expandInitialBranch(chapters.value)
+  } catch (error) {
+    loadError.value = '章节目录加载失败，请稍后重试。'
+  } finally {
+    loading.value = false
+  }
+}
+
+function expandInitialBranch(tree) {
+  expandedBooks.value = new Set()
+  expandedChapters.value = new Set()
+}
+
+function isBookExpanded(bookId) {
+  return expandedBooks.value.has(bookId)
+}
+
+function isChapterExpanded(chapterId) {
+  return expandedChapters.value.has(chapterId)
+}
+
+function toggleBook(bookId) {
+  const next = new Set(expandedBooks.value)
+  if (next.has(bookId)) {
+    next.delete(bookId)
+  } else {
+    next.add(bookId)
+  }
+  expandedBooks.value = next
+}
+
+function toggleChapter(chapterId) {
+  const next = new Set(expandedChapters.value)
+  if (next.has(chapterId)) {
+    next.delete(chapterId)
+  } else {
+    next.add(chapterId)
+  }
+  expandedChapters.value = next
+}
 
 function goStudy(chapterId) {
   router.push({ path: '/study', query: { chapterId } })

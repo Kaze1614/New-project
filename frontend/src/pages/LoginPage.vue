@@ -2,7 +2,6 @@
   <section class="auth-wrapper">
     <div class="auth-card-v2">
       <h2>数学园</h2>
-      <p class="muted">注册账号后即可进入个人学习空间。</p>
 
       <div class="auth-tabs">
         <button :class="{ active: mode === 'login' }" type="button" @click="mode = 'login'">登录</button>
@@ -64,12 +63,11 @@ async function submit() {
   loading.value = true
   error.value = ''
   try {
-    if (mode.value === 'login') {
-      await authStore.login(form.username, form.password)
-    } else {
-      await authStore.register(form.username, form.password)
-    }
-    router.push('/dashboard')
+    const session = mode.value === 'login'
+      ? await authStore.login(form.username, form.password)
+      : await authStore.register(form.username, form.password)
+    const target = session?.user?.username === 'admin' ? '/admin/questions' : '/dashboard'
+    router.push(target)
   } catch (err) {
     error.value = err?.response?.data?.message || '请求失败，请检查输入'
   } finally {

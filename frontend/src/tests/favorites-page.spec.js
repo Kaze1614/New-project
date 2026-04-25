@@ -31,6 +31,8 @@ describe('FavoritesPage', () => {
     await flushPromises()
 
     expect(wrapper.find('.filter-bar').exists()).toBe(true)
+    expect(wrapper.text()).not.toContain('章节ID')
+    expect(wrapper.text()).not.toContain('全部难度')
     expect(wrapper.find('.question-grid').exists()).toBe(true)
     expect(wrapper.text()).toContain('函数解析式')
     expect(wrapper.text()).toContain('章节 5')

@@ -70,58 +70,46 @@
             <div v-if="form.imageUrl" class="url-row">
               <input :value="form.imageUrl" readonly aria-label="图片 URL" />
               <button class="outline-btn" type="button" @click="copyText(form.imageUrl)">复制 URL</button>
-              <button class="outline-btn" type="button" @click="insertImageLatex">插入 LaTeX</button>
+              <button class="outline-btn" type="button" @click="insertImageLatex">插入图片代码</button>
             </div>
-            <p v-else class="field-tip warning-text">双轨制建议上传原题截图，便于公式复杂时保真展示。</p>
+            <p v-else class="field-tip warning-text">建议上传原题截图，复杂公式可通过图片保持展示一致性。</p>
           </article>
 
           <article class="admin-section latex-card">
-            <div class="section-headline">
+            <div class="section-headline compact">
               <div>
-                <p class="section-eyebrow">区域 B</p>
+                <p class="section-eyebrow">区域 C</p>
                 <h2>题干编辑</h2>
               </div>
-              <div class="source-preview">{{ sourceLabel || '待生成出处标签' }}</div>
-            </div>
-
-            <div class="symbol-toolbar" aria-label="常用数学符号工具栏">
-              <button v-for="symbol in symbols" :key="symbol.label" type="button" @click="insertSnippet(symbol.snippet, 'raw')">
-                {{ symbol.label }}
-              </button>
             </div>
 
             <label class="textarea-field">
-              <span>题目文本（LaTeX）</span>
+              <span>题干</span>
               <textarea
                 ref="rawTextInput"
                 v-model="form.rawTextLatex"
-                rows="14"
-                placeholder="输入题干与选项。提交时会自动按 题号.(年份)(卷名) 重组出处前缀。"
-                @focus="activeEditor = 'raw'"
+                rows="15"
+                placeholder="输入题干与选项。录入者可直接手写公式代码或从外部工具粘贴。"
               ></textarea>
             </label>
           </article>
 
           <article class="admin-section answer-grid">
             <label class="textarea-field">
-              <span>答案（LaTeX）</span>
+              <span>标准答案</span>
               <textarea
-                ref="answerInput"
                 v-model="form.answerLatex"
                 rows="7"
                 placeholder="如：A 或 $\left\{-1,1\right\}$"
-                @focus="activeEditor = 'answer'"
               ></textarea>
             </label>
 
             <label class="textarea-field">
               <span>教师解析</span>
               <textarea
-                ref="explanationInput"
                 v-model="form.teacherExplanation"
-                rows="10"
-                placeholder="教师补充解析：第一步，..."
-                @focus="activeEditor = 'explanation'"
+                rows="11"
+                placeholder="填写官方或教师整理的标准解析。"
               ></textarea>
             </label>
           </article>
@@ -129,7 +117,7 @@
           <article class="admin-section source-card">
             <div>
               <p class="section-eyebrow">区域 D</p>
-              <h2>溯源信息</h2>
+              <h2>来源信息</h2>
             </div>
             <label>
               <span>年份</span>
@@ -139,7 +127,7 @@
               <span>试卷来源</span>
               <input v-model.trim="form.sourcePaper" type="text" placeholder="全国甲卷" />
             </label>
-            <p class="field-tip">提交入库的题干将使用：{{ sourceLabel || '题号.(年份)(卷名)' }} 题干文本及选项。</p>
+            <p class="field-tip">题号、年份与试卷来源会在保存时形成题干前缀，便于后续检索与溯源。</p>
           </article>
         </section>
 
@@ -147,7 +135,7 @@
           <div class="preview-sticky">
             <div class="preview-head">
               <div>
-                <p class="section-eyebrow">区域 C</p>
+                <p class="section-eyebrow">Preview</p>
                 <h2>实时预览</h2>
               </div>
               <span class="student-chip">学生端视图</span>
@@ -155,8 +143,8 @@
 
             <article class="student-preview-card">
               <div class="preview-question-meta">
-                <span>{{ selectedBook?.title || '未选教材' }}</span>
-                <span>{{ selectedSection?.title || '未选小节' }}</span>
+                <span>{{ currentBookName || '未选教材' }}</span>
+                <span>{{ currentSectionName || '未选小节' }}</span>
               </div>
 
               <div v-if="form.imageUrl" class="preview-image-wrap">
@@ -170,9 +158,9 @@
               </section>
 
               <section class="preview-block answer-preview">
-                <h3>答案</h3>
+                <h3>标准答案</h3>
                 <div v-if="renderedAnswer.hasContent" class="rendered-latex" :class="{ invalid: renderedAnswer.hasError }" v-html="renderedAnswer.html"></div>
-                <p v-else class="preview-empty">暂未填写答案。</p>
+                <p v-else class="preview-empty">暂未填写标准答案。</p>
               </section>
 
               <section class="preview-block explanation-preview">
@@ -182,7 +170,7 @@
               </section>
             </article>
 
-            <div v-if="previewHasError" class="render-warning">有公式渲染失败，已保留原始 LaTeX，请检查反斜杠、括号和分隔符。</div>
+            <div v-if="previewHasError" class="render-warning">有公式渲染失败，已保留原始代码，请检查反斜杠、括号和分隔符。</div>
           </div>
         </aside>
       </div>
@@ -190,9 +178,9 @@
       <footer class="admin-submit-bar">
         <p :class="['submit-message', messageType]">{{ submitMessage }}</p>
         <div class="submit-actions">
-          <button class="outline-btn" type="button" @click="resetForm">取消</button>
+          <button class="outline-btn" type="button" @click="cancelEdit">取消</button>
           <button class="outline-btn" type="button" @click="scrollPreview">预览学生端</button>
-          <button class="primary-btn" type="submit" :disabled="submitting">{{ submitting ? '提交中...' : '提交入库' }}</button>
+          <button class="primary-btn" type="submit" :disabled="submitting">{{ submitting ? '保存中...' : isEditMode ? '保存修改' : '提交入库' }}</button>
         </div>
       </footer>
     </form>
@@ -202,18 +190,12 @@
 <script setup>
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
-import { computed, nextTick, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { api, unwrap } from '../api/client'
 
-const symbols = [
-  { label: '\\frac{}{}', snippet: '\\frac{}{}' },
-  { label: '\\sqrt{}', snippet: '\\sqrt{}' },
-  { label: '\\Delta', snippet: '\\Delta' },
-  { label: '\\left(\\right)', snippet: '\\left(  \\right)' },
-  { label: 'cases', snippet: '\\begin{cases}\n  \\n\\end{cases}' },
-  { label: '\\mathbb{}', snippet: '\\mathbb{}' },
-  { label: '\\vec{}', snippet: '\\vec{}' }
-]
+const route = useRoute()
+const router = useRouter()
 
 const form = reactive({
   imageUrl: '',
@@ -222,7 +204,10 @@ const form = reactive({
   teacherExplanation: '',
   sourceYear: new Date().getFullYear(),
   sourcePaper: '',
-  questionNo: null
+  questionNo: null,
+  bookName: '',
+  chapterName: '',
+  sectionName: ''
 })
 
 const chapterTree = ref([])
@@ -231,19 +216,20 @@ const selectedChapterId = ref('')
 const selectedSectionId = ref('')
 const fileInput = ref(null)
 const rawTextInput = ref(null)
-const answerInput = ref(null)
-const explanationInput = ref(null)
-const activeEditor = ref('raw')
 const dragging = ref(false)
 const submitting = ref(false)
 const submitMessage = ref('填写完整后可提交入库。')
 const messageType = ref('muted')
 
+const isEditMode = computed(() => Boolean(route.params.id))
 const selectedBook = computed(() => chapterTree.value.find((item) => String(item.id) === String(selectedBookId.value)))
 const chapterOptions = computed(() => selectedBook.value?.children || [])
 const selectedChapter = computed(() => chapterOptions.value.find((item) => String(item.id) === String(selectedChapterId.value)))
 const sectionOptions = computed(() => selectedChapter.value?.children || [])
 const selectedSection = computed(() => sectionOptions.value.find((item) => String(item.id) === String(selectedSectionId.value)))
+const currentBookName = computed(() => selectedBook.value?.title || form.bookName)
+const currentChapterName = computed(() => selectedChapter.value?.title || form.chapterName)
+const currentSectionName = computed(() => selectedSection.value?.title || form.sectionName)
 
 const sourceLabel = computed(() => {
   const questionNo = Number(form.questionNo)
@@ -264,7 +250,19 @@ const renderedAnswer = computed(() => renderLatexText(form.answerLatex))
 const renderedExplanation = computed(() => renderLatexText(form.teacherExplanation))
 const previewHasError = computed(() => renderedRaw.value.hasError || renderedAnswer.value.hasError || renderedExplanation.value.hasError)
 
-onMounted(loadChapters)
+onMounted(initializePage)
+watch(() => route.params.id, initializePage)
+
+async function initializePage() {
+  await loadChapters()
+  if (isEditMode.value) {
+    await loadQuestion(route.params.id)
+  } else {
+    resetForm(false)
+    submitMessage.value = '填写完整后可提交入库。'
+    messageType.value = 'muted'
+  }
+}
 
 async function loadChapters() {
   try {
@@ -274,6 +272,46 @@ async function loadChapters() {
     submitMessage.value = '章节目录加载失败，请确认后端服务已启动。'
     messageType.value = 'error'
   }
+}
+
+async function loadQuestion(id) {
+  submitting.value = true
+  submitMessage.value = '正在加载题目...'
+  messageType.value = 'muted'
+  try {
+    const data = await unwrap(api.get(`/admin/math-questions/${id}`))
+    applyQuestion(data)
+    submitMessage.value = '题目已加载，可继续编辑。'
+    messageType.value = 'muted'
+  } catch (error) {
+    submitMessage.value = error?.response?.data?.message || '题目加载失败。'
+    messageType.value = 'error'
+  } finally {
+    submitting.value = false
+  }
+}
+
+function applyQuestion(data) {
+  form.imageUrl = data.imageUrl || ''
+  form.rawTextLatex = stripSourcePrefix(data.rawTextLatex || '')
+  form.answerLatex = data.answerLatex || ''
+  form.teacherExplanation = data.teacherExplanation || ''
+  form.sourceYear = data.sourceYear || new Date().getFullYear()
+  form.sourcePaper = data.sourcePaper || ''
+  form.questionNo = data.questionNo || null
+  form.bookName = data.bookName || ''
+  form.chapterName = data.chapterName || ''
+  form.sectionName = data.sectionName || ''
+  resolveChapterSelection()
+}
+
+function resolveChapterSelection() {
+  const book = chapterTree.value.find((item) => item.title === form.bookName)
+  selectedBookId.value = book ? String(book.id) : ''
+  const chapter = book?.children?.find((item) => item.title === form.chapterName)
+  selectedChapterId.value = chapter ? String(chapter.id) : ''
+  const section = chapter?.children?.find((item) => item.title === form.sectionName)
+  selectedSectionId.value = section ? String(section.id) : ''
 }
 
 function resetChapter() {
@@ -325,28 +363,19 @@ async function uploadFile(file) {
   }
 }
 
-function insertSnippet(snippet, target = activeEditor.value) {
-  const map = {
-    raw: { ref: rawTextInput, key: 'rawTextLatex' },
-    answer: { ref: answerInput, key: 'answerLatex' },
-    explanation: { ref: explanationInput, key: 'teacherExplanation' }
-  }
-  const entry = map[target] || map.raw
-  const el = entry.ref.value
-  const value = form[entry.key] || ''
+function insertImageLatex() {
+  if (!form.imageUrl) return
+  const snippet = `\n\\includegraphics[width=\\linewidth]{${form.imageUrl}}\n`
+  const el = rawTextInput.value
+  const value = form.rawTextLatex || ''
   const start = el?.selectionStart ?? value.length
   const end = el?.selectionEnd ?? value.length
-  form[entry.key] = value.slice(0, start) + snippet + value.slice(end)
+  form.rawTextLatex = value.slice(0, start) + snippet + value.slice(end)
   nextTick(() => {
     el?.focus()
     const cursor = start + snippet.length
     el?.setSelectionRange(cursor, cursor)
   })
-}
-
-function insertImageLatex() {
-  if (!form.imageUrl) return
-  insertSnippet(`\\includegraphics[width=\\linewidth]{${form.imageUrl}}`, 'raw')
 }
 
 async function copyText(text) {
@@ -369,7 +398,7 @@ async function submitQuestion() {
   }
 
   submitting.value = true
-  submitMessage.value = '正在提交入库...'
+  submitMessage.value = '正在保存题目...'
   messageType.value = 'muted'
   try {
     const payload = {
@@ -377,18 +406,22 @@ async function submitQuestion() {
       rawTextLatex: normalizedRawText.value,
       answerLatex: form.answerLatex.trim() || null,
       teacherExplanation: form.teacherExplanation.trim() || null,
-      bookName: selectedBook.value.title,
-      chapterName: selectedChapter.value.title,
-      sectionName: selectedSection.value.title,
+      bookName: currentBookName.value,
+      chapterName: currentChapterName.value,
+      sectionName: currentSectionName.value,
       sourceYear: form.sourceYear || null,
       sourcePaper: form.sourcePaper || null,
       questionNo: Number(form.questionNo)
     }
-    const saved = await unwrap(api.post('/admin/math-questions', payload))
-    submitMessage.value = `已提交入库：${saved.sourceLabel || `ID ${saved.id}`}`
-    messageType.value = 'success'
+    if (isEditMode.value) {
+      await unwrap(api.put(`/admin/math-questions/${route.params.id}`, payload))
+      await router.push({ path: '/admin/questions', query: { saved: 'updated' } })
+    } else {
+      await unwrap(api.post('/admin/math-questions', payload))
+      await router.push({ path: '/admin/questions', query: { saved: 'created' } })
+    }
   } catch (error) {
-    submitMessage.value = error?.response?.data?.message || '提交入库失败。'
+    submitMessage.value = error?.response?.data?.message || '保存失败。'
     messageType.value = 'error'
   } finally {
     submitting.value = false
@@ -396,15 +429,15 @@ async function submitQuestion() {
 }
 
 function validateForm() {
-  if (!selectedBook.value) return '请选择教材名。'
-  if (!selectedChapter.value) return '请选择章节名。'
-  if (!selectedSection.value) return '请选择小节名。'
+  if (!currentBookName.value) return '请选择教材名。'
+  if (!currentChapterName.value) return '请选择章节名。'
+  if (!currentSectionName.value) return '请选择小节名。'
   if (!Number.isFinite(Number(form.questionNo)) || Number(form.questionNo) <= 0) return '请输入有效题号。'
   if (!form.rawTextLatex.trim()) return '题干不能为空。'
   return ''
 }
 
-function resetForm() {
+function resetForm(updateMessage = true) {
   form.imageUrl = ''
   form.rawTextLatex = ''
   form.answerLatex = ''
@@ -412,11 +445,20 @@ function resetForm() {
   form.sourceYear = new Date().getFullYear()
   form.sourcePaper = ''
   form.questionNo = null
+  form.bookName = ''
+  form.chapterName = ''
+  form.sectionName = ''
   selectedBookId.value = ''
   selectedChapterId.value = ''
   selectedSectionId.value = ''
-  submitMessage.value = '已清空当前表单。'
-  messageType.value = 'muted'
+  if (updateMessage) {
+    submitMessage.value = '已清空当前表单。'
+    messageType.value = 'muted'
+  }
+}
+
+function cancelEdit() {
+  router.push('/admin/questions')
 }
 
 function scrollPreview() {

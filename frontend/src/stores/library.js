@@ -16,8 +16,8 @@ export const useLibraryStore = defineStore('library', {
     favorites: [],
     loadingMistakes: false,
     loadingFavorites: false,
-    mistakeFilters: { chapterId: '', difficulty: '', keyword: '' },
-    favoriteFilters: { chapterId: '', difficulty: '', keyword: '' }
+    mistakeFilters: { keyword: '' },
+    favoriteFilters: { keyword: '' }
   }),
   actions: {
     async loadMistakes() {

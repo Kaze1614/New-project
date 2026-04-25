@@ -31,6 +31,8 @@ describe('MistakesPage', () => {
     await flushPromises()
 
     expect(wrapper.find('.filter-bar').exists()).toBe(true)
+    expect(wrapper.text()).not.toContain('章节ID')
+    expect(wrapper.text()).not.toContain('全部难度')
     expect(wrapper.find('.question-grid').exists()).toBe(true)
     expect(wrapper.text()).toContain('函数定义域判定')
     expect(wrapper.text()).not.toContain('AI分析')

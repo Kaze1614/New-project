@@ -41,7 +41,6 @@
           <p v-if="reviewStore.currentTask.explanationReviewStatus === 'PENDING_REVIEW'" class="review-warning">
             该解析为教师补充解析或题面含公式图片，建议人工复核后用于正式练习。
           </p>
-          <button class="ghost-btn" type="button" @click="openAIExplain">💡 没看懂解析？</button>
         </div>
 
         <div class="rating-row">
@@ -63,10 +62,8 @@
 <script setup>
 import { onMounted } from 'vue'
 import { useReviewStore } from '../stores/review'
-import { useUiStore } from '../stores/ui'
 
 const reviewStore = useReviewStore()
-const uiStore = useUiStore()
 
 onMounted(() => {
   reviewStore.loadNext()
@@ -85,15 +82,4 @@ function explanationTitle(task) {
   return task?.explanationSource === 'TEACHER_GENERATED' ? '教师补充解析' : '官方解析'
 }
 
-function openAIExplain() {
-  if (!reviewStore.currentTask) return
-  const task = reviewStore.currentTask
-  const context = [
-    `出处：${task.sourceLabel || '题库题目'}`,
-    `题目：${task.questionContent}`,
-    `标准答案：${task.officialAnswer || '暂无'}`,
-    `${explanationTitle(task)}：${task.officialExplanation || '暂无'}`,
-  ].join('\n')
-  uiStore.openAIDrawer(context)
-}
 </script>

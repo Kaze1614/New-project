@@ -38,7 +38,8 @@ class AuthControllerTest {
                 ))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.token").isNotEmpty())
-            .andExpect(jsonPath("$.data.user.username").value(username));
+            .andExpect(jsonPath("$.data.user.username").value(username))
+            .andExpect(jsonPath("$.data.user.role").value("STUDENT"));
 
         mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -47,6 +48,22 @@ class AuthControllerTest {
                     "password", "123456"
                 ))))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.token").isNotEmpty());
+            .andExpect(jsonPath("$.data.token").isNotEmpty())
+            .andExpect(jsonPath("$.data.user.role").value("STUDENT"));
+    }
+
+    @Test
+    void defaultAdminAccountShouldLoginAsAdmin() throws Exception {
+        mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "username", "admin",
+                    "password", "123456"
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.token").isNotEmpty())
+            .andExpect(jsonPath("$.data.user.username").value("admin"))
+            .andExpect(jsonPath("$.data.user.displayName").value("Admin"))
+            .andExpect(jsonPath("$.data.user.role").value("ADMIN"));
     }
 }

@@ -25,6 +25,7 @@ public class AuthService {
         rs.getLong("id"),
         rs.getString("username"),
         rs.getString("display_name"),
+        rs.getString("role"),
         rs.getString("password_hash")
     );
 
@@ -44,27 +45,29 @@ public class AuthService {
         }
 
         String displayName = request.username();
+        String role = "STUDENT";
 
         KeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(connection -> {
             PreparedStatement ps = connection.prepareStatement(
-                "INSERT INTO users(username, password_hash, display_name) VALUES(?,?,?)",
+                "INSERT INTO users(username, password_hash, display_name, role) VALUES(?,?,?,?)",
                 Statement.RETURN_GENERATED_KEYS
             );
             ps.setString(1, request.username());
             ps.setString(2, passwordEncoder.encode(request.password()));
             ps.setString(3, displayName);
+            ps.setString(4, role);
             return ps;
         }, keyHolder);
 
         Long userId = extractId(keyHolder, "Create user failed");
         String token = createToken(userId);
-        return new AuthResponse(token, new UserProfile(userId, request.username(), displayName));
+        return new AuthResponse(token, new UserProfile(userId, request.username(), displayName, role));
     }
 
     public AuthResponse login(LoginRequest request) {
         var users = jdbcTemplate.query(
-            "SELECT id, username, display_name, password_hash FROM users WHERE username = ?",
+            "SELECT id, username, display_name, role, password_hash FROM users WHERE username = ?",
             userRowMapper,
             request.username()
         );
@@ -78,7 +81,7 @@ public class AuthService {
         }
 
         String token = createToken(user.id());
-        return new AuthResponse(token, new UserProfile(user.id(), user.username(), user.displayName()));
+        return new AuthResponse(token, new UserProfile(user.id(), user.username(), user.displayName(), user.role()));
     }
 
     public Long requireUserId(String authorizationHeader) {
@@ -89,6 +92,15 @@ public class AuthService {
         Long userId = sessions.get(token);
         if (userId == null) {
             throw new AppException(401, "Session expired");
+        }
+        return userId;
+    }
+
+    public Long requireAdminUserId(String authorizationHeader) {
+        Long userId = requireUserId(authorizationHeader);
+        String role = jdbcTemplate.queryForObject("SELECT role FROM users WHERE id = ?", String.class, userId);
+        if (!"ADMIN".equalsIgnoreCase(role)) {
+            throw new AppException(403, "Admin access required");
         }
         return userId;
     }
@@ -121,6 +133,6 @@ public class AuthService {
         throw new AppException(500, errorMessage);
     }
 
-    private record UserRow(Long id, String username, String displayName, String passwordHash) {
+    private record UserRow(Long id, String username, String displayName, String role, String passwordHash) {
     }
 }
