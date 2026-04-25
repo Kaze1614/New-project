@@ -85,14 +85,18 @@ class LearningFlowTest {
         mockMvc.perform(post("/api/review/tasks/{id}/complete", taskId)
                 .header("Authorization", "Bearer " + token))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.completed").value(true));
+            .andExpect(jsonPath("$.data.completed").value(false))
+            .andExpect(jsonPath("$.data.repetition").value(2))
+            .andExpect(jsonPath("$.data.intervalDays").value(3))
+            .andExpect(jsonPath("$.data.lastGrade").value("EASY"));
 
         mockMvc.perform(get("/api/dashboard/overview")
                 .header("Authorization", "Bearer " + token))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.questionBankTotal").value(20))
             .andExpect(jsonPath("$.data.totalMistakes").value(1))
-            .andExpect(jsonPath("$.data.mastered").value(1));
+            .andExpect(jsonPath("$.data.mastered").value(0))
+            .andExpect(jsonPath("$.data.pendingReview").value(1));
 
         mockMvc.perform(get("/api/search")
                 .header("Authorization", "Bearer " + token)

@@ -689,6 +689,18 @@ button:focus-visible {
   font-weight: 700;
 }
 
+.matrix-cell.answered-correct {
+  background: #ecfdf5;
+  border-color: #86efac;
+  color: #047857;
+}
+
+.matrix-cell.answered-wrong {
+  background: #fef2f2;
+  border-color: #fca5a5;
+  color: #b91c1c;
+}
+
 .review-card {
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);

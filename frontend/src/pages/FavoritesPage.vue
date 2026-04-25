@@ -2,22 +2,21 @@
   <section class="library-page">
     <header class="library-head">
       <h2>收藏本</h2>
-      <p>用关键词回看已收藏题目。</p>
+      <p>按关键词回看已收藏题目，卡片只展示章节节名称与题目内容。</p>
     </header>
 
     <form class="filter-bar" @submit.prevent="applyFilters">
-      <input v-model.trim="filters.keyword" type="text" placeholder="关键词搜索题干" />
+      <input v-model.trim="filters.keyword" type="text" placeholder="搜索收藏题目" />
       <button class="primary-btn" type="submit">筛选</button>
     </form>
 
-    <p v-if="libraryStore.loadingFavorites" class="muted">加载中...</p>
-    <p v-else-if="!libraryStore.favorites.length" class="muted">暂无收藏</p>
+    <p v-if="libraryStore.loadingFavorites" class="muted">正在加载收藏数据...</p>
+    <p v-else-if="!libraryStore.favorites.length" class="muted">当前还没有收藏题目</p>
 
     <div v-else class="question-grid">
       <article v-for="item in libraryStore.favorites" :key="item.id" class="question-card">
         <div class="card-top">
-          <span class="tag">{{ item.difficulty || 'UNKNOWN' }}</span>
-          <span class="tag chapter">章节 {{ item.chapterId || '未标注' }}</span>
+          <span class="tag chapter">{{ sectionLabel(item.chapterId) }}</span>
         </div>
         <h3>{{ item.title }}</h3>
         <p>{{ item.content }}</p>
@@ -30,22 +29,37 @@
 </template>
 
 <script setup>
-import { onMounted, reactive } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { api, unwrap } from '../api/client'
 import { useLibraryStore } from '../stores/library'
+import { buildSectionLabelMap, resolveSectionLabel } from '../utils/chapterLabels'
 
 const libraryStore = useLibraryStore()
 const filters = reactive({
   keyword: ''
 })
+const chapterLabelMap = ref(new Map())
 
-onMounted(() => {
-  applyFilters()
+onMounted(async () => {
+  await Promise.all([loadChapterLabels(), applyFilters()])
 })
+
+async function loadChapterLabels() {
+  try {
+    const tree = await unwrap(api.get('/chapters/tree'))
+    chapterLabelMap.value = buildSectionLabelMap(tree)
+  } catch {
+    chapterLabelMap.value = new Map()
+  }
+}
 
 async function applyFilters() {
   libraryStore.favoriteFilters = { ...filters }
   await libraryStore.loadFavorites()
+}
+
+function sectionLabel(chapterId) {
+  return resolveSectionLabel(chapterLabelMap.value, chapterId)
 }
 
 async function remove(id) {

@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -27,9 +28,10 @@ public class ReviewController {
 
     @GetMapping("/tasks")
     public ApiResponse<List<ReviewTaskView>> list(
-        @RequestHeader(value = "Authorization", required = false) String authorization
+        @RequestHeader(value = "Authorization", required = false) String authorization,
+        @RequestParam(required = false) String scope
     ) {
-        return ApiResponse.ok(reviewService.list(authService.requireUserId(authorization)));
+        return ApiResponse.ok(reviewService.list(authService.requireUserId(authorization), scope));
     }
 
     @GetMapping("/next")
@@ -54,5 +56,13 @@ public class ReviewController {
         @Valid @RequestBody ReviewRateRequest request
     ) {
         return ApiResponse.ok(reviewService.rate(authService.requireUserId(authorization), id, request.grade()));
+    }
+
+    @PostMapping("/submit")
+    public ApiResponse<ReviewSubmitResponse> submit(
+        @RequestHeader(value = "Authorization", required = false) String authorization,
+        @Valid @RequestBody ReviewSubmitRequest request
+    ) {
+        return ApiResponse.ok(reviewService.submit(authService.requireUserId(authorization), request));
     }
 }

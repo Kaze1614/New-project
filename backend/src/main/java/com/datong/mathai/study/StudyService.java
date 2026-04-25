@@ -376,7 +376,7 @@ public class StudyService {
             mistakeId,
             Timestamp.valueOf(now.plusDays(1)),
             0,
-            0,
+            1,
             1,
             2.5d,
             0,

@@ -1,6 +1,7 @@
 package com.datong.mathai.review;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 public record ReviewTaskView(
     Long id,
@@ -10,6 +11,8 @@ public record ReviewTaskView(
     String difficulty,
     String questionTitle,
     String questionContent,
+    String type,
+    List<String> options,
     String sourceLabel,
     String sourceSnapshotPath,
     String explanationSource,

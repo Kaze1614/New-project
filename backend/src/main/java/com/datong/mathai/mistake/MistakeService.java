@@ -183,11 +183,16 @@ public class MistakeService {
         if (taskCount == null || taskCount == 0) {
             LocalDateTime now = LocalDateTime.now();
             jdbcTemplate.update(
-                "INSERT INTO review_tasks(user_id, mistake_id, due_date, completed, created_at, updated_at) VALUES(?,?,?,?,?,?)",
+                "INSERT INTO review_tasks(user_id, mistake_id, due_date, completed, repetition, interval_days, ease_factor, suspended, last_grade, created_at, updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                 userId,
                 mistakeId,
                 Timestamp.valueOf(now.plusDays(1)),
                 0,
+                1,
+                1,
+                2.5d,
+                0,
+                null,
                 Timestamp.valueOf(now),
                 Timestamp.valueOf(now)
             );
