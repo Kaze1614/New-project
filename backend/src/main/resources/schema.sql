@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS chapters (
 
 CREATE TABLE IF NOT EXISTS questions (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  source_math_question_id BIGINT NULL,
   chapter_id BIGINT NOT NULL,
   title VARCHAR(180) NOT NULL,
   content TEXT NOT NULL,
@@ -90,6 +91,7 @@ CREATE TABLE IF NOT EXISTS mistake_analysis (
 CREATE TABLE IF NOT EXISTS favorites (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   user_id BIGINT NOT NULL,
+  question_id BIGINT NULL,
   chapter_id BIGINT NULL,
   difficulty VARCHAR(24) NULL,
   title VARCHAR(180) NOT NULL,
@@ -166,7 +168,9 @@ CREATE INDEX idx_mistake_question ON mistake_records(question_id);
 CREATE INDEX idx_review_user ON review_tasks(user_id);
 CREATE INDEX idx_review_due ON review_tasks(user_id, due_date);
 CREATE INDEX idx_favorite_user ON favorites(user_id);
+CREATE INDEX idx_favorite_question ON favorites(question_id);
 CREATE INDEX idx_question_chapter ON questions(chapter_id);
+CREATE INDEX idx_question_source_math ON questions(source_math_question_id);
 CREATE INDEX idx_question_source ON questions(source_year, source_paper, source_question_no);
 CREATE INDEX idx_question_import_batch ON questions(import_batch);
 CREATE INDEX idx_math_question_source ON math_questions(source_year, source_paper, question_no);

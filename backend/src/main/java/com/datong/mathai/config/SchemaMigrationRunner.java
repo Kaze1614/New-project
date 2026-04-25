@@ -28,6 +28,19 @@ public class SchemaMigrationRunner implements ApplicationRunner {
         jdbcTemplate.update("UPDATE users SET role = 'ADMIN' WHERE LOWER(username) = 'admin'");
         jdbcTemplate.update("UPDATE users SET role = 'STUDENT' WHERE role IS NULL OR role = ''");
 
+        Set<String> questionColumns = loadColumns("questions");
+        ensureColumn(questionColumns, "questions", "source_math_question_id", "BIGINT NULL");
+
+        Set<String> mistakeColumns = loadColumns("mistake_records");
+        ensureColumn(mistakeColumns, "mistake_records", "question_id", "BIGINT NULL");
+        ensureColumn(mistakeColumns, "mistake_records", "chapter_id", "BIGINT NULL");
+        ensureColumn(mistakeColumns, "mistake_records", "difficulty", "VARCHAR(24) NULL");
+
+        Set<String> favoriteColumns = loadColumns("favorites");
+        ensureColumn(favoriteColumns, "favorites", "question_id", "BIGINT NULL");
+        ensureColumn(favoriteColumns, "favorites", "chapter_id", "BIGINT NULL");
+        ensureColumn(favoriteColumns, "favorites", "difficulty", "VARCHAR(24) NULL");
+
         Set<String> reviewTaskColumns = loadColumns("review_tasks");
         ensureColumn(reviewTaskColumns, "review_tasks", "repetition", "INT NOT NULL DEFAULT 0");
         ensureColumn(reviewTaskColumns, "review_tasks", "interval_days", "INT NOT NULL DEFAULT 1");

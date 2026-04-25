@@ -2,6 +2,7 @@ package com.datong.mathai;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -40,24 +41,27 @@ class AdminMathQuestionControllerTest {
         jdbcTemplate.update("DELETE FROM math_questions");
         String token = loginAdmin();
 
+        Map<String, String> createSection = loadChapterPath(1L, 2L, 3L);
+        String createRawText = "1.(2026)(Test Paper) Set A={1,2}. How many elements are in A?";
+
         MvcResult createResult = mockMvc.perform(post("/api/admin/math-questions")
                 .header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                     "imageUrl", "/uploads/questions/demo.png",
-                    "rawTextLatex", "1.(2026)(全国卷) 已知集合 A={1,2}，求 A 的元素个数。",
+                    "rawTextLatex", createRawText,
                     "answerLatex", "2",
-                    "teacherExplanation", "集合 A 中有两个元素。",
-                    "bookName", "必修第一册",
-                    "chapterName", "第一章 集合与常用逻辑用语",
-                    "sectionName", "集合的概念",
+                    "teacherExplanation", "Set A contains two elements.",
+                    "bookName", createSection.get("book"),
+                    "chapterName", createSection.get("chapter"),
+                    "sectionName", createSection.get("section"),
                     "sourceYear", 2026,
-                    "sourcePaper", "全国卷",
+                    "sourcePaper", "Test Paper",
                     "questionNo", 1
                 ))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.id").isNumber())
-            .andExpect(jsonPath("$.data.sourceLabel").value("1.(2026)(全国卷)"))
+            .andExpect(jsonPath("$.data.sourceLabel").value("1.(2026)(Test Paper)"))
             .andReturn();
 
         JsonNode createNode = objectMapper.readTree(createResult.getResponse().getContentAsString());
@@ -65,7 +69,7 @@ class AdminMathQuestionControllerTest {
 
         mockMvc.perform(get("/api/admin/math-questions")
                 .header("Authorization", "Bearer " + token)
-                .param("keyword", "集合")
+                .param("keyword", "elements")
                 .param("page", "1")
                 .param("size", "10"))
             .andExpect(status().isOk())
@@ -76,21 +80,31 @@ class AdminMathQuestionControllerTest {
         mockMvc.perform(get("/api/admin/math-questions/{id}", id)
                 .header("Authorization", "Bearer " + token))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.rawTextLatex").value("1.(2026)(全国卷) 已知集合 A={1,2}，求 A 的元素个数。"));
+            .andExpect(jsonPath("$.data.rawTextLatex").value(createRawText));
+
+        Integer syncedQuestionCount = jdbcTemplate.queryForObject(
+            "SELECT COUNT(1) FROM questions WHERE source_math_question_id = ? AND import_status = 'READY'",
+            Integer.class,
+            id
+        );
+        Assertions.assertEquals(1, syncedQuestionCount);
+
+        Map<String, String> updateSection = loadChapterPath(1L, 12L, 13L);
+        String updateRawText = "2.(2026)(Test Paper) Given f(x)=x+1, find f(2).";
 
         mockMvc.perform(put("/api/admin/math-questions/{id}", id)
                 .header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                     "imageUrl", "/uploads/questions/demo.png",
-                    "rawTextLatex", "2.(2026)(全国卷) 已知函数 f(x)=x+1，求 f(2)。",
+                    "rawTextLatex", updateRawText,
                     "answerLatex", "3",
-                    "teacherExplanation", "代入 x=2，得到 3。",
-                    "bookName", "必修第一册",
-                    "chapterName", "第三章 函数的概念与性质",
-                    "sectionName", "函数的概念",
+                    "teacherExplanation", "Substitute x=2 and get 3.",
+                    "bookName", updateSection.get("book"),
+                    "chapterName", updateSection.get("chapter"),
+                    "sectionName", updateSection.get("section"),
                     "sourceYear", 2026,
-                    "sourcePaper", "全国卷",
+                    "sourcePaper", "Test Paper",
                     "questionNo", 2
                 ))))
             .andExpect(status().isOk())
@@ -101,9 +115,36 @@ class AdminMathQuestionControllerTest {
                 .header("Authorization", "Bearer " + token))
             .andExpect(status().isOk());
 
+        String importStatus = jdbcTemplate.queryForObject(
+            "SELECT import_status FROM questions WHERE source_math_question_id = ?",
+            String.class,
+            id
+        );
+        Assertions.assertEquals("REMOVED", importStatus);
+
         mockMvc.perform(get("/api/admin/math-questions/{id}", id)
                 .header("Authorization", "Bearer " + token))
             .andExpect(status().isNotFound());
+    }
+
+    private Map<String, String> loadChapterPath(Long bookId, Long chapterId, Long sectionId) {
+        return jdbcTemplate.queryForObject(
+            """
+                SELECT b.title AS book_title, c.title AS chapter_title, s.title AS section_title
+                FROM chapters s
+                JOIN chapters c ON s.parent_id = c.id
+                JOIN chapters b ON c.parent_id = b.id
+                WHERE b.id = ? AND c.id = ? AND s.id = ?
+                """,
+            (rs, rowNum) -> Map.of(
+                "book", rs.getString("book_title"),
+                "chapter", rs.getString("chapter_title"),
+                "section", rs.getString("section_title")
+            ),
+            bookId,
+            chapterId,
+            sectionId
+        );
     }
 
     private String loginAdmin() throws Exception {

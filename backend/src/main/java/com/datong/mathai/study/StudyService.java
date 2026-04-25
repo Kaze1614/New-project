@@ -177,7 +177,8 @@ public class StudyService {
         List<StudySessionItemView> items = jdbcTemplate.query(
             """
                 SELECT si.id AS item_id, si.question_id, si.sort_order, si.user_answer_json, si.is_correct, si.answered_at,
-                       q.type, q.difficulty, q.title, q.content, q.options_json, q.answer_json, q.explanation
+                       q.type, q.difficulty, q.title, q.content, q.options_json, q.answer_json, q.explanation,
+                       q.source_label, q.source_snapshot_path, q.explanation_source, q.explanation_review_status
                 FROM study_session_items si
                 JOIN questions q ON q.id = si.question_id
                 WHERE si.session_id = ?
@@ -197,6 +198,10 @@ public class StudyService {
                     parseAnswerForDisplay(userAnswerJson),
                     userAnswerJson != null && !userAnswerJson.isBlank(),
                     rs.getObject("is_correct") == null ? null : rs.getBoolean("is_correct"),
+                    rs.getString("source_label"),
+                    rs.getString("source_snapshot_path"),
+                    rs.getString("explanation_source"),
+                    rs.getString("explanation_review_status"),
                     reveal ? parseAnswerForDisplay(rs.getString("answer_json")) : null,
                     reveal ? rs.getString("explanation") : null,
                     rs.getTimestamp("answered_at") == null ? null : rs.getTimestamp("answered_at").toLocalDateTime()
@@ -234,7 +239,7 @@ public class StudyService {
         List<QuestionSeed> selected;
         if (chapterId == null) {
             selected = jdbcTemplate.query(
-                "SELECT id, chapter_id FROM questions ORDER BY RAND() LIMIT ?",
+                "SELECT id, chapter_id FROM questions WHERE import_status = 'READY' ORDER BY RAND() LIMIT ?",
                 (rs, rowNum) -> new QuestionSeed(rs.getLong("id"), rs.getLong("chapter_id")),
                 limit
             );
@@ -242,7 +247,7 @@ public class StudyService {
         }
 
         selected = jdbcTemplate.query(
-            "SELECT id, chapter_id FROM questions WHERE chapter_id = ? ORDER BY RAND() LIMIT ?",
+            "SELECT id, chapter_id FROM questions WHERE chapter_id = ? AND import_status = 'READY' ORDER BY RAND() LIMIT ?",
             (rs, rowNum) -> new QuestionSeed(rs.getLong("id"), rs.getLong("chapter_id")),
             chapterId,
             limit
@@ -256,10 +261,10 @@ public class StudyService {
             usedIds.add(questionSeed.id());
         }
         int remain = limit - selected.size();
-        StringBuilder sql = new StringBuilder("SELECT id, chapter_id FROM questions");
+        StringBuilder sql = new StringBuilder("SELECT id, chapter_id FROM questions WHERE import_status = 'READY'");
         List<Object> args = new ArrayList<>();
         if (!usedIds.isEmpty()) {
-            sql.append(" WHERE id NOT IN (");
+            sql.append(" AND id NOT IN (");
             for (int i = 0; i < usedIds.size(); i++) {
                 if (i > 0) {
                     sql.append(",");
@@ -283,6 +288,27 @@ public class StudyService {
     }
 
     private long insertMistake(Long userId, SubmissionRow row, LocalDateTime now) {
+        Long existingId = findExistingMistakeId(userId, row.questionId());
+        if (existingId != null) {
+            jdbcTemplate.update(
+                """
+                    UPDATE mistake_records
+                    SET chapter_id = ?, difficulty = ?, question_title = ?, question_content = ?, image_url = ?, status = ?, updated_at = ?
+                    WHERE id = ? AND user_id = ?
+                    """,
+                row.chapterId(),
+                normalizeDifficulty(row.difficulty()),
+                row.title(),
+                row.content(),
+                null,
+                "REVIEWING",
+                Timestamp.valueOf(now),
+                existingId,
+                userId
+            );
+            return existingId;
+        }
+
         KeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(connection -> {
             PreparedStatement ps = connection.prepareStatement(
@@ -305,6 +331,25 @@ public class StudyService {
             return ps;
         }, keyHolder);
         return extractId(keyHolder, "Create mistake failed");
+    }
+
+    private Long findExistingMistakeId(Long userId, Long questionId) {
+        if (questionId == null) {
+            return null;
+        }
+        List<Long> rows = jdbcTemplate.query(
+            """
+                SELECT id
+                FROM mistake_records
+                WHERE user_id = ? AND question_id = ?
+                ORDER BY updated_at DESC, id DESC
+                LIMIT 1
+                """,
+            (rs, rowNum) -> rs.getLong("id"),
+            userId,
+            questionId
+        );
+        return rows.isEmpty() ? null : rows.get(0);
     }
 
     private void ensureReviewTask(Long userId, long mistakeId, long questionId, LocalDateTime now) {

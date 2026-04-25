@@ -78,7 +78,7 @@ class StudyFlowTest {
         mockMvc.perform(get("/api/dashboard/overview")
                 .header("Authorization", "Bearer " + token))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.questionBankTotal").value(1))
+            .andExpect(jsonPath("$.data.questionBankTotal").value(20))
             .andExpect(jsonPath("$.data.totalMistakes").value(1))
             .andExpect(jsonPath("$.data.pendingReview").value(1));
     }

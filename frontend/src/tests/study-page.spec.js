@@ -43,6 +43,7 @@ function makeSession({ submitted = false, answered = false } = {}) {
 
 vi.mock('../api/client', () => {
   const api = {
+    get: vi.fn(),
     post: vi.fn((url) => {
       if (url === '/study/sessions') {
         sessionState = makeSession()
@@ -88,8 +89,33 @@ describe('StudyPage', () => {
       answer: 'A'
     })
 
-    await wrapper.findAll('.primary-btn')[0].trigger('click')
+    await wrapper.find('.primary-btn').trigger('click')
     await flushPromises()
     expect(wrapper.text()).toContain('教师补充解析')
+  })
+
+  it('shows submit error text when submit request fails', async () => {
+    api.post.mockImplementation((url) => {
+      if (url === '/study/sessions') {
+        sessionState = makeSession({ answered: true })
+        return Promise.resolve(sessionState)
+      }
+      if (url === '/study/sessions/1/submit') {
+        return Promise.reject({ response: { data: { message: '提交失败' } } })
+      }
+      return Promise.resolve(sessionState)
+    })
+
+    const wrapper = mount(StudyPage, {
+      global: {
+        plugins: [createPinia()]
+      }
+    })
+    await flushPromises()
+
+    await wrapper.find('.primary-btn').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('提交失败')
   })
 })

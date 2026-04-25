@@ -15,6 +15,10 @@ public record StudySessionItemView(
     String userAnswer,
     boolean answered,
     Boolean correct,
+    String sourceLabel,
+    String sourceSnapshotPath,
+    String explanationSource,
+    String explanationReviewStatus,
     String officialAnswer,
     String officialExplanation,
     LocalDateTime answeredAt

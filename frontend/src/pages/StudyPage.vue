@@ -2,7 +2,7 @@
   <section class="study-page">
     <header class="study-head">
       <h2>沉浸式刷题</h2>
-      <p>题目与答案来自题库；提交本组后展示标准答案与解析来源。</p>
+      <p>题目与答案均来自题库，提交后展示标准答案与解析来源。</p>
     </header>
 
     <div v-if="studyStore.loading" class="panel-card">组卷中...</div>
@@ -55,7 +55,7 @@
             {{ currentItem.officialExplanation || '暂无解析' }}
           </p>
           <p v-if="currentItem.explanationReviewStatus === 'PENDING_REVIEW'" class="review-warning">
-            该解析为教师补充解析或题面含公式图片，建议人工复核后用于正式练习。
+            当前解析仍处于待复核状态，建议人工确认后再作为正式练习依据。
           </p>
         </div>
 
@@ -78,6 +78,7 @@
             {{ studyStore.submitting ? '提交中...' : '提交本组' }}
           </button>
         </footer>
+        <p v-if="actionError" class="error-text">{{ actionError }}</p>
       </article>
 
       <aside class="study-side">
@@ -117,6 +118,7 @@ const studyStore = useStudyStore()
 const currentIndex = ref(0)
 const fillDraft = ref('')
 const tick = ref(Date.now())
+const actionError = ref('')
 let timer = null
 
 const session = computed(() => studyStore.session)
@@ -144,7 +146,11 @@ watch(currentItem, (item) => {
 
 onMounted(async () => {
   const chapterId = Number(route.query.chapterId) || null
-  await studyStore.createSession(chapterId)
+  try {
+    await studyStore.createSession(chapterId)
+  } catch (error) {
+    actionError.value = error?.response?.data?.message || '创建刷题会话失败，请稍后重试'
+  }
   timer = window.setInterval(() => {
     tick.value = Date.now()
   }, 1000)
@@ -178,18 +184,28 @@ function isSelected(option) {
 async function selectOption(option) {
   if (!session.value || !currentItem.value || session.value.submitted) return
   const code = extractOptionCode(option)
-  if (currentItem.value.type === 'MULTI') {
-    const next = new Set(selectedCodes())
-    next.has(code) ? next.delete(code) : next.add(code)
-    await studyStore.saveAnswer(session.value.id, currentItem.value.itemId, [...next].sort().join(''))
-    return
+  actionError.value = ''
+  try {
+    if (currentItem.value.type === 'MULTI') {
+      const next = new Set(selectedCodes())
+      next.has(code) ? next.delete(code) : next.add(code)
+      await studyStore.saveAnswer(session.value.id, currentItem.value.itemId, [...next].sort().join(''))
+      return
+    }
+    await studyStore.saveAnswer(session.value.id, currentItem.value.itemId, code)
+  } catch (error) {
+    actionError.value = error?.response?.data?.message || '保存答案失败，请稍后重试'
   }
-  await studyStore.saveAnswer(session.value.id, currentItem.value.itemId, code)
 }
 
 async function saveFillAnswer() {
   if (!session.value || !currentItem.value || session.value.submitted || !fillDraft.value) return
-  await studyStore.saveAnswer(session.value.id, currentItem.value.itemId, fillDraft.value)
+  actionError.value = ''
+  try {
+    await studyStore.saveAnswer(session.value.id, currentItem.value.itemId, fillDraft.value)
+  } catch (error) {
+    actionError.value = error?.response?.data?.message || '保存答案失败，请稍后重试'
+  }
 }
 
 function goPrev() {
@@ -213,11 +229,15 @@ function matrixClass(index, item) {
 
 async function submitSession() {
   if (!session.value || session.value.submitted) return
-  await studyStore.submitSession(session.value.id)
+  actionError.value = ''
+  try {
+    await studyStore.submitSession(session.value.id)
+  } catch (error) {
+    actionError.value = error?.response?.data?.message || '提交本组失败，请稍后重试'
+  }
 }
 
 function explanationTitle(item) {
   return item?.explanationSource === 'TEACHER_GENERATED' ? '教师补充解析' : '官方解析'
 }
-
 </script>

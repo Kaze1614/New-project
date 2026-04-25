@@ -1,6 +1,7 @@
 package com.datong.mathai.admin;
 
 import com.datong.mathai.common.AppException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
@@ -12,6 +13,7 @@ import java.sql.Statement;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -20,6 +22,7 @@ public class AdminMathQuestionService {
     private static final int MAX_PAGE_SIZE = 100;
 
     private final JdbcTemplate jdbcTemplate;
+    private final ObjectMapper objectMapper;
 
     private final RowMapper<MathQuestionDetail> detailMapper = (rs, rowNum) -> new MathQuestionDetail(
         rs.getLong("id"),
@@ -38,8 +41,9 @@ public class AdminMathQuestionService {
         rs.getTimestamp("updated_at").toLocalDateTime()
     );
 
-    public AdminMathQuestionService(JdbcTemplate jdbcTemplate) {
+    public AdminMathQuestionService(JdbcTemplate jdbcTemplate, ObjectMapper objectMapper) {
         this.jdbcTemplate = jdbcTemplate;
+        this.objectMapper = objectMapper;
     }
 
     public PageResult<MathQuestionListItem> list(String keyword, Integer page, Integer size) {
@@ -104,7 +108,7 @@ public class AdminMathQuestionService {
             id
         );
         if (rows.isEmpty()) {
-            throw new AppException(404, "题目不存在");
+            throw new AppException(404, "Question not found");
         }
         return rows.get(0);
     }
@@ -128,7 +132,10 @@ public class AdminMathQuestionService {
             ps.setTimestamp(12, Timestamp.valueOf(now));
             return ps;
         }, keyHolder);
-        return get(extractId(keyHolder, "题目保存失败"));
+
+        Long id = extractId(keyHolder, "Create math question failed");
+        syncRuntimeQuestion(id, request, now);
+        return get(id);
     }
 
     public MathQuestionDetail update(Long id, MathQuestionRequest request) {
@@ -149,20 +156,123 @@ public class AdminMathQuestionService {
             return ps;
         });
         if (affected == 0) {
-            throw new AppException(404, "题目不存在");
+            throw new AppException(404, "Question not found");
         }
+        syncRuntimeQuestion(id, request, now);
         return get(id);
     }
 
     public void delete(Long id) {
         int affected = jdbcTemplate.update("DELETE FROM math_questions WHERE id = ?", id);
         if (affected == 0) {
-            throw new AppException(404, "题目不存在");
+            throw new AppException(404, "Question not found");
         }
+        jdbcTemplate.update("UPDATE questions SET import_status = 'REMOVED' WHERE source_math_question_id = ?", id);
+    }
+
+    private void syncRuntimeQuestion(Long mathQuestionId, MathQuestionRequest request, LocalDateTime now) {
+        Long sectionId = resolveSectionId(request);
+        String sourceLabel = buildSourceLabel(request.sourceYear(), request.sourcePaper(), request.questionNo());
+        String strippedContent = stripSourcePrefix(request.rawTextLatex().trim());
+        String title = preview(strippedContent);
+        String content = sourceLabel.isBlank() ? strippedContent : (sourceLabel + " " + strippedContent).trim();
+        String explanation = blankToNull(request.teacherExplanation());
+        String answerJson = serializeAnswerList(normalizeAnswers(request.answerLatex()));
+        String explanationSource = explanation == null ? "NONE" : "TEACHER_GENERATED";
+
+        List<Long> runtimeRows = jdbcTemplate.query(
+            "SELECT id FROM questions WHERE source_math_question_id = ? LIMIT 1",
+            (rs, rowNum) -> rs.getLong("id"),
+            mathQuestionId
+        );
+
+        if (runtimeRows.isEmpty()) {
+            jdbcTemplate.update(
+                """
+                    INSERT INTO questions(
+                        source_math_question_id, chapter_id, title, content, type, options_json, answer_json, explanation, difficulty,
+                        source_year, source_paper, source_question_no, source_label, source_snapshot_path, exam_section,
+                        import_batch, import_status, explanation_source, explanation_review_status, created_at
+                    ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    """,
+                mathQuestionId,
+                sectionId,
+                title,
+                content,
+                "FILL",
+                null,
+                answerJson,
+                explanation,
+                "MEDIUM",
+                request.sourceYear(),
+                blankToNull(request.sourcePaper()),
+                String.valueOf(request.questionNo()),
+                sourceLabel,
+                blankToNull(request.imageUrl()),
+                request.sectionName().trim(),
+                "ADMIN_SYNC",
+                "READY",
+                explanationSource,
+                "PENDING_REVIEW",
+                Timestamp.valueOf(now)
+            );
+            return;
+        }
+
+        jdbcTemplate.update(
+            """
+                UPDATE questions
+                SET chapter_id = ?, title = ?, content = ?, type = ?, options_json = ?, answer_json = ?, explanation = ?, difficulty = ?,
+                    source_year = ?, source_paper = ?, source_question_no = ?, source_label = ?, source_snapshot_path = ?, exam_section = ?,
+                    import_batch = ?, import_status = ?, explanation_source = ?, explanation_review_status = ?
+                WHERE source_math_question_id = ?
+                """,
+            sectionId,
+            title,
+            content,
+            "FILL",
+            null,
+            answerJson,
+            explanation,
+            "MEDIUM",
+            request.sourceYear(),
+            blankToNull(request.sourcePaper()),
+            String.valueOf(request.questionNo()),
+            sourceLabel,
+            blankToNull(request.imageUrl()),
+            request.sectionName().trim(),
+            "ADMIN_SYNC",
+            "READY",
+            explanationSource,
+            "PENDING_REVIEW",
+            mathQuestionId
+        );
+    }
+
+    private Long resolveSectionId(MathQuestionRequest request) {
+        List<Long> rows = jdbcTemplate.query(
+            """
+                SELECT s.id
+                FROM chapters s
+                JOIN chapters c ON s.parent_id = c.id
+                JOIN chapters b ON c.parent_id = b.id
+                WHERE b.title = ? AND c.title = ? AND s.title = ?
+                ORDER BY s.id ASC
+                LIMIT 1
+                """,
+            (rs, rowNum) -> rs.getLong("id"),
+            request.bookName().trim(),
+            request.chapterName().trim(),
+            request.sectionName().trim()
+        );
+        if (rows.isEmpty()) {
+            throw new AppException(400, "Chapter tree mapping not found");
+        }
+        return rows.get(0);
     }
 
     private void bindRequest(PreparedStatement ps, MathQuestionRequest request) throws java.sql.SQLException {
-        ps.setString(1, blankToNull(request.imageUrl()));
+        ps.setString(1, normalizeImageUrl(request.imageUrl()));
         ps.setString(2, request.rawTextLatex().trim());
         ps.setString(3, blankToNull(request.answerLatex()));
         ps.setString(4, blankToNull(request.teacherExplanation()));
@@ -185,6 +295,48 @@ public class AdminMathQuestionService {
         return value.trim();
     }
 
+    private String normalizeImageUrl(String value) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+        return value.trim();
+    }
+
+    private List<String> normalizeAnswers(String answerLatex) {
+        String normalized = blankToNull(answerLatex);
+        if (normalized == null) {
+            return List.of();
+        }
+        if (normalized.matches("^[A-Za-z]{2,}$")) {
+            List<String> result = new ArrayList<>();
+            for (char item : normalized.toUpperCase().toCharArray()) {
+                result.add(String.valueOf(item));
+            }
+            return result;
+        }
+        if (normalized.matches("^[A-Za-z](?:[\\s,;/|、，]+[A-Za-z])+$")) {
+            List<String> result = new ArrayList<>();
+            for (String item : normalized.split("[\\s,;/|、，]+")) {
+                if (!item.isBlank()) {
+                    result.add(item.trim().toUpperCase());
+                }
+            }
+            return result;
+        }
+        return List.of(normalized);
+    }
+
+    private String serializeAnswerList(List<String> answers) {
+        if (answers == null || answers.isEmpty()) {
+            return null;
+        }
+        try {
+            return objectMapper.writeValueAsString(answers);
+        } catch (Exception ex) {
+            throw new AppException(500, "Serialize answer failed");
+        }
+    }
+
     private static Integer getNullableInteger(Object value) {
         if (value == null) {
             return null;
@@ -204,10 +356,17 @@ public class AdminMathQuestionService {
 
     private static String preview(String value) {
         if (value == null || value.isBlank()) {
-            return "未填写题干";
+            return "Untitled question";
         }
         String text = value.replaceAll("\\s+", " ").trim();
         return text.length() > 96 ? text.substring(0, 96) + "..." : text;
+    }
+
+    private String stripSourcePrefix(String value) {
+        return value
+            .replaceFirst("^\\s*\\d+\\.\\(\\d{4}\\)\\([^)]*\\)\\s*", "")
+            .replaceFirst("^\\s*\\d+\\.\\s*", "")
+            .trim();
     }
 
     private Long extractId(KeyHolder keyHolder, String errorMessage) {

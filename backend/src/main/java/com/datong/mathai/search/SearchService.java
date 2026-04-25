@@ -27,7 +27,7 @@ public class SearchService {
         );
 
         var questions = jdbcTemplate.query(
-            "SELECT id, title, content FROM questions WHERE title LIKE ? OR content LIKE ? ORDER BY id DESC LIMIT 20",
+            "SELECT id, title, content FROM questions WHERE import_status = 'READY' AND (title LIKE ? OR content LIKE ?) ORDER BY id DESC LIMIT 20",
             (rs, rowNum) -> new SearchQuestionItem(rs.getLong("id"), rs.getString("title"), rs.getString("content")),
             like,
             like

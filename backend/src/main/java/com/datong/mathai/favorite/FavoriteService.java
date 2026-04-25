@@ -23,7 +23,7 @@ public class FavoriteService {
     }
 
     public List<FavoriteItem> list(Long userId, Long chapterId, String difficulty, String keyword) {
-        StringBuilder sql = new StringBuilder("SELECT id, chapter_id, difficulty, title, content, created_at FROM favorites WHERE user_id = ?");
+        StringBuilder sql = new StringBuilder("SELECT id, question_id, chapter_id, difficulty, title, content, created_at FROM favorites WHERE user_id = ?");
         List<Object> args = new ArrayList<>();
         args.add(userId);
 
@@ -47,6 +47,7 @@ public class FavoriteService {
             sql.toString(),
             (rs, rowNum) -> new FavoriteItem(
                 rs.getLong("id"),
+                rs.getObject("question_id") == null ? null : rs.getLong("question_id"),
                 rs.getObject("chapter_id") == null ? null : rs.getLong("chapter_id"),
                 rs.getString("difficulty"),
                 rs.getString("title"),
@@ -59,27 +60,62 @@ public class FavoriteService {
 
     public FavoriteItem create(Long userId, CreateFavoriteRequest request) {
         LocalDateTime now = LocalDateTime.now();
+        if (request.questionId() != null) {
+            List<FavoriteItem> existing = jdbcTemplate.query(
+                "SELECT id, question_id, chapter_id, difficulty, title, content, created_at FROM favorites WHERE user_id = ? AND question_id = ? LIMIT 1",
+                (rs, rowNum) -> new FavoriteItem(
+                    rs.getLong("id"),
+                    rs.getObject("question_id") == null ? null : rs.getLong("question_id"),
+                    rs.getObject("chapter_id") == null ? null : rs.getLong("chapter_id"),
+                    rs.getString("difficulty"),
+                    rs.getString("title"),
+                    rs.getString("content"),
+                    rs.getTimestamp("created_at").toLocalDateTime()
+                ),
+                userId,
+                request.questionId()
+            );
+            if (!existing.isEmpty()) {
+                FavoriteItem item = existing.get(0);
+                jdbcTemplate.update(
+                    "UPDATE favorites SET chapter_id = ?, difficulty = ?, title = ?, content = ? WHERE id = ? AND user_id = ?",
+                    request.chapterId(),
+                    request.difficulty() == null ? null : request.difficulty().trim().toUpperCase(),
+                    request.title(),
+                    request.content(),
+                    item.id(),
+                    userId
+                );
+                return new FavoriteItem(item.id(), request.questionId(), request.chapterId(), normalizeDifficulty(request.difficulty()), request.title(), request.content(), item.createdAt());
+            }
+        }
+
         KeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(connection -> {
             PreparedStatement ps = connection.prepareStatement(
-                "INSERT INTO favorites(user_id, chapter_id, difficulty, title, content, created_at) VALUES(?,?,?,?,?,?)",
+                "INSERT INTO favorites(user_id, question_id, chapter_id, difficulty, title, content, created_at) VALUES(?,?,?,?,?,?,?)",
                 Statement.RETURN_GENERATED_KEYS
             );
             ps.setLong(1, userId);
-            if (request.chapterId() == null) {
+            if (request.questionId() == null) {
                 ps.setObject(2, null);
             } else {
-                ps.setLong(2, request.chapterId());
+                ps.setLong(2, request.questionId());
             }
-            ps.setString(3, request.difficulty() == null ? null : request.difficulty().trim().toUpperCase());
-            ps.setString(4, request.title());
-            ps.setString(5, request.content());
-            ps.setTimestamp(6, java.sql.Timestamp.valueOf(now));
+            if (request.chapterId() == null) {
+                ps.setObject(3, null);
+            } else {
+                ps.setLong(3, request.chapterId());
+            }
+            ps.setString(4, normalizeDifficulty(request.difficulty()));
+            ps.setString(5, request.title());
+            ps.setString(6, request.content());
+            ps.setTimestamp(7, java.sql.Timestamp.valueOf(now));
             return ps;
         }, keyHolder);
 
         Long id = extractId(keyHolder, "Create favorite failed");
-        return new FavoriteItem(id, request.chapterId(), request.difficulty(), request.title(), request.content(), now);
+        return new FavoriteItem(id, request.questionId(), request.chapterId(), normalizeDifficulty(request.difficulty()), request.title(), request.content(), now);
     }
 
     public void delete(Long userId, Long id) {
@@ -109,5 +145,12 @@ public class FavoriteService {
             }
         }
         throw new AppException(500, errorMessage);
+    }
+
+    private String normalizeDifficulty(String difficulty) {
+        if (difficulty == null || difficulty.isBlank()) {
+            return null;
+        }
+        return difficulty.trim().toUpperCase();
     }
 }

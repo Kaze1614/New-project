@@ -16,7 +16,7 @@ public class DashboardService {
     }
 
     public DashboardOverview overview(Long userId) {
-        int questionBankTotal = queryInt("SELECT COUNT(1) FROM math_questions");
+        int questionBankTotal = queryInt("SELECT COUNT(1) FROM questions WHERE import_status = 'READY'");
         int totalMistakes = queryInt("SELECT COUNT(1) FROM mistake_records WHERE user_id = ?", userId);
         int mastered = queryInt("SELECT COUNT(1) FROM mistake_records WHERE user_id = ? AND status = 'MASTERED'", userId);
         int pendingReview = queryInt("SELECT COUNT(1) FROM review_tasks WHERE user_id = ? AND completed = 0 AND suspended = 0", userId);

@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 public record CreateFavoriteRequest(
+    Long questionId,
     Long chapterId,
     String difficulty,
     @NotBlank(message = "Title is required")

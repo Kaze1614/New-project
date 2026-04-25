@@ -172,6 +172,7 @@ public class ReviewService {
         return """
             SELECT r.id, r.mistake_id, r.due_date, r.completed, r.suspended, r.repetition, r.interval_days, r.ease_factor, r.last_grade, r.completed_at,
                    m.question_id, m.chapter_id, m.difficulty, m.question_title, m.question_content,
+                   q.source_label, q.source_snapshot_path, q.explanation_source, q.explanation_review_status,
                    q.answer_json, q.explanation
             FROM review_tasks r
             JOIN mistake_records m ON r.mistake_id = m.id
@@ -189,6 +190,10 @@ public class ReviewService {
             rs.getString("difficulty"),
             rs.getString("question_title"),
             rs.getString("question_content"),
+            rs.getString("source_label"),
+            rs.getString("source_snapshot_path"),
+            rs.getString("explanation_source"),
+            rs.getString("explanation_review_status"),
             parseAnswerForDisplay(rs.getString("answer_json")),
             rs.getString("explanation"),
             rs.getTimestamp("due_date").toLocalDateTime(),

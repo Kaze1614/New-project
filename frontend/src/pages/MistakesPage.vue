@@ -51,6 +51,7 @@ async function applyFilters() {
 
 async function addFavorite(item) {
   await unwrap(api.post('/favorites', {
+    questionId: item.questionId,
     chapterId: item.chapterId,
     difficulty: item.difficulty,
     title: item.questionTitle,
