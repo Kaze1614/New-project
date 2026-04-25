@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia } from 'pinia'
 import { flushPromises, mount } from '@vue/test-utils'
 
@@ -32,7 +32,7 @@ function makeSession({ submitted = false, answered = false } = {}) {
       answered: answered && index === 0,
       correct: submitted && index === 0 ? false : null,
       officialAnswer: submitted ? 'B' : null,
-      officialExplanation: submitted ? '教师补充解析内容' : null,
+      officialExplanation: submitted ? '解析内容' : null,
       explanationSource: submitted ? 'TEACHER_GENERATED' : null,
       explanationReviewStatus: submitted ? 'PENDING_REVIEW' : null,
       sourceLabel: `${index + 1}.(2025)(全国I卷)`,
@@ -70,7 +70,16 @@ import StudyPage from '../pages/StudyPage.vue'
 import { api } from '../api/client'
 
 describe('StudyPage', () => {
-  it('renders 7:3 layout with source label, matrix and submit flow', async () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-04-25T10:00:00.000Z'))
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('renders layout, starts timer, matrix and submit flow', async () => {
     const wrapper = mount(StudyPage, {
       global: {
         plugins: [createPinia()]
@@ -81,6 +90,13 @@ describe('StudyPage', () => {
     expect(wrapper.find('.study-layout').exists()).toBe(true)
     expect(wrapper.findAll('.matrix-cell')).toHaveLength(20)
     expect(wrapper.text()).toContain('1.(2025)(全国I卷)')
+    expect(wrapper.text()).toContain('导航矩阵')
+    expect(wrapper.text()).toContain('计时器')
+    expect(wrapper.text()).not.toContain('全局计时')
+    expect(wrapper.find('.timer-value').text()).toBe('00:00:00')
+
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(wrapper.find('.timer-value').text()).toBe('00:00:05')
 
     await wrapper.find('.option-card').trigger('click')
     await flushPromises()
@@ -91,7 +107,8 @@ describe('StudyPage', () => {
 
     await wrapper.find('.primary-btn').trigger('click')
     await flushPromises()
-    expect(wrapper.text()).toContain('教师补充解析')
+    expect(wrapper.text()).toContain('正确答案：')
+    expect(wrapper.text()).toContain('解析：')
   })
 
   it('shows submit error text when submit request fails', async () => {

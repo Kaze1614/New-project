@@ -2,10 +2,9 @@
   <section class="study-page">
     <header class="study-head">
       <h2>沉浸式刷题</h2>
-      <p>题目与答案均来自题库，提交后展示标准答案与解析来源。</p>
     </header>
 
-    <div v-if="studyStore.loading" class="panel-card">组卷中...</div>
+    <div v-if="studyStore.loading" class="panel-card">正在组卷...</div>
     <div v-else-if="!session" class="panel-card">当前暂无可用学习会话。</div>
     <div v-else class="study-layout">
       <article class="study-main">
@@ -47,15 +46,12 @@
 
         <div v-if="session.submitted" class="result-panel">
           <p>
-            <strong>标准答案：</strong>
+            <strong>正确答案：</strong>
             {{ currentItem.officialAnswer || '暂无' }}
           </p>
           <p>
-            <strong>{{ explanationTitle(currentItem) }}：</strong>
+            <strong>解析：</strong>
             {{ currentItem.officialExplanation || '暂无解析' }}
-          </p>
-          <p v-if="currentItem.explanationReviewStatus === 'PENDING_REVIEW'" class="review-warning">
-            当前解析仍处于待复核状态，建议人工确认后再作为正式练习依据。
           </p>
         </div>
 
@@ -83,12 +79,12 @@
 
       <aside class="study-side">
         <article class="side-card timer-card">
-          <h4>全局计时</h4>
+          <h4>计时器</h4>
           <p class="timer-value">{{ displayTime }}</p>
         </article>
 
         <article class="side-card">
-          <h4>20 题导航矩阵</h4>
+          <h4>导航矩阵</h4>
           <div class="matrix-grid">
             <button
               v-for="(item, index) in session.items"
@@ -118,25 +114,28 @@ const studyStore = useStudyStore()
 const currentIndex = ref(0)
 const fillDraft = ref('')
 const tick = ref(Date.now())
+const localStartTime = ref(Date.now())
+const frozenElapsedSeconds = ref(null)
 const actionError = ref('')
 let timer = null
 
 const session = computed(() => studyStore.session)
 const currentItem = computed(() => session.value?.items?.[currentIndex.value] ?? null)
 
-const remainingSeconds = computed(() => {
+const elapsedSeconds = computed(() => {
   if (!session.value) return 0
-  if (session.value.submitted) return 0
-  const started = new Date(session.value.startedAt).getTime()
-  const deadline = started + session.value.durationSeconds * 1000
-  return Math.max(0, Math.floor((deadline - tick.value) / 1000))
+  if (session.value.submitted && frozenElapsedSeconds.value !== null) {
+    return frozenElapsedSeconds.value
+  }
+  return Math.max(0, Math.floor((tick.value - localStartTime.value) / 1000))
 })
 
 const displayTime = computed(() => {
-  const total = remainingSeconds.value
-  const minutes = Math.floor(total / 60).toString().padStart(2, '0')
+  const total = elapsedSeconds.value
+  const hours = Math.floor(total / 3600).toString().padStart(2, '0')
+  const minutes = Math.floor((total % 3600) / 60).toString().padStart(2, '0')
   const seconds = (total % 60).toString().padStart(2, '0')
-  return `${minutes}:${seconds}`
+  return `${hours}:${minutes}:${seconds}`
 })
 
 watch(currentItem, (item) => {
@@ -144,10 +143,26 @@ watch(currentItem, (item) => {
   fillDraft.value = item.userAnswer || ''
 })
 
+watch(
+  () => session.value?.id,
+  () => {
+    currentIndex.value = 0
+    actionError.value = ''
+    const now = Date.now()
+    localStartTime.value = now
+    tick.value = now
+    frozenElapsedSeconds.value = null
+  }
+)
+
 onMounted(async () => {
   const chapterId = Number(route.query.chapterId) || null
   try {
     await studyStore.createSession(chapterId)
+    const now = Date.now()
+    localStartTime.value = now
+    tick.value = now
+    frozenElapsedSeconds.value = null
   } catch (error) {
     actionError.value = error?.response?.data?.message || '创建刷题会话失败，请稍后重试'
   }
@@ -232,12 +247,9 @@ async function submitSession() {
   actionError.value = ''
   try {
     await studyStore.submitSession(session.value.id)
+    frozenElapsedSeconds.value = Math.max(0, Math.floor((tick.value - localStartTime.value) / 1000))
   } catch (error) {
     actionError.value = error?.response?.data?.message || '提交本组失败，请稍后重试'
   }
-}
-
-function explanationTitle(item) {
-  return item?.explanationSource === 'TEACHER_GENERATED' ? '教师补充解析' : '官方解析'
 }
 </script>
