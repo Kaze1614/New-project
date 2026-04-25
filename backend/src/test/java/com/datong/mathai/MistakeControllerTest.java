@@ -36,8 +36,8 @@ class MistakeControllerTest {
     private JdbcTemplate jdbcTemplate;
 
     @Test
-    void listShouldReturnQuestionDetailFieldsWhenQuestionExists() throws Exception {
-        String username = "mistake_detail_" + System.currentTimeMillis();
+    void listShouldReturnSingleQuestionDetailFieldsWhenQuestionExists() throws Exception {
+        String username = "mistake_single_" + System.currentTimeMillis();
         String token = registerAndGetToken(username);
         Long userId = jdbcTemplate.queryForObject("SELECT id FROM users WHERE username = ?", Long.class, username);
 
@@ -92,6 +92,101 @@ class MistakeControllerTest {
         } finally {
             jdbcTemplate.update("DELETE FROM mistake_records WHERE user_id = ?", userId);
             jdbcTemplate.update("DELETE FROM questions WHERE id = ?", questionId);
+        }
+    }
+
+    @Test
+    void listShouldReturnMultiAndFillQuestionDetailFields() throws Exception {
+        String username = "mistake_types_" + System.currentTimeMillis();
+        String token = registerAndGetToken(username);
+        Long userId = jdbcTemplate.queryForObject("SELECT id FROM users WHERE username = ?", Long.class, username);
+
+        long multiQuestionId = 99002L;
+        long fillQuestionId = 99003L;
+        jdbcTemplate.update("DELETE FROM mistake_records WHERE user_id = ?", userId);
+        jdbcTemplate.update("DELETE FROM questions WHERE id IN (?, ?)", multiQuestionId, fillQuestionId);
+        try {
+            jdbcTemplate.update(
+                """
+                    INSERT INTO questions(
+                        id, chapter_id, title, content, type, options_json, answer_json, explanation, difficulty,
+                        source_label, import_status
+                    ) VALUES(?,?,?,?,?,?,?,?,?,?,?)
+                    """,
+                multiQuestionId,
+                4L,
+                "集合运算",
+                "下列哪些选项属于集合 A？",
+                "MULTI",
+                "[\"A. 1\",\"B. 2\",\"C. 3\",\"D. 4\"]",
+                "[\"A\",\"C\"]",
+                "集合 A 中包含 1 和 3。",
+                "MEDIUM",
+                "教材例题",
+                "READY"
+            );
+            jdbcTemplate.update(
+                """
+                    INSERT INTO questions(
+                        id, chapter_id, title, content, type, options_json, answer_json, explanation, difficulty,
+                        source_label, import_status
+                    ) VALUES(?,?,?,?,?,?,?,?,?,?,?)
+                    """,
+                fillQuestionId,
+                4L,
+                "函数值计算",
+                "已知 f(x)=2x+1，则 f(3)=？",
+                "FILL",
+                "[]",
+                "[\"7\"]",
+                "代入 x=3，可得 2×3+1=7。",
+                "EASY",
+                "教材例题",
+                "READY"
+            );
+            jdbcTemplate.update(
+                """
+                    INSERT INTO mistake_records(user_id, question_id, chapter_id, difficulty, question_title, question_content, image_url, status, created_at, updated_at)
+                    VALUES(?,?,?,?,?,?,?,?,?,?)
+                    """,
+                userId,
+                multiQuestionId,
+                4L,
+                "MEDIUM",
+                "集合运算",
+                "下列哪些选项属于集合 A？",
+                null,
+                "REVIEWING",
+                Timestamp.valueOf(LocalDateTime.now()),
+                Timestamp.valueOf(LocalDateTime.now())
+            );
+            jdbcTemplate.update(
+                """
+                    INSERT INTO mistake_records(user_id, question_id, chapter_id, difficulty, question_title, question_content, image_url, status, created_at, updated_at)
+                    VALUES(?,?,?,?,?,?,?,?,?,?)
+                    """,
+                userId,
+                fillQuestionId,
+                4L,
+                "EASY",
+                "函数值计算",
+                "已知 f(x)=2x+1，则 f(3)=？",
+                null,
+                "REVIEWING",
+                Timestamp.valueOf(LocalDateTime.now().plusSeconds(1)),
+                Timestamp.valueOf(LocalDateTime.now().plusSeconds(1))
+            );
+
+            mockMvc.perform(get("/api/mistakes").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].questionType").value("FILL"))
+                .andExpect(jsonPath("$.data[0].correctAnswer").value("7"))
+                .andExpect(jsonPath("$.data[1].questionType").value("MULTI"))
+                .andExpect(jsonPath("$.data[1].correctAnswer").value("A,C"))
+                .andExpect(jsonPath("$.data[1].options[2]").value("C. 3"));
+        } finally {
+            jdbcTemplate.update("DELETE FROM mistake_records WHERE user_id = ?", userId);
+            jdbcTemplate.update("DELETE FROM questions WHERE id IN (?, ?)", multiQuestionId, fillQuestionId);
         }
     }
 

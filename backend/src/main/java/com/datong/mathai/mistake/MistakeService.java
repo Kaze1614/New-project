@@ -265,7 +265,8 @@ public class MistakeService {
         return answers.stream()
             .map(String::trim)
             .filter(item -> !item.isBlank())
-            .collect(Collectors.joining(", "));
+            .map(String::toUpperCase)
+            .collect(Collectors.joining(","));
     }
 
     private record MistakeRow(Long id, String title, String content) {

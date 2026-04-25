@@ -16,36 +16,31 @@ vi.mock('../api/client', () => {
 import MistakesPage from '../pages/MistakesPage.vue'
 import { api } from '../api/client'
 
+const chapterTree = [
+  {
+    id: 1,
+    title: '高等数学上册',
+    children: [
+      {
+        id: 2,
+        title: '函数',
+        children: [{ id: 4, title: '函数的定义域', children: [] }]
+      }
+    ]
+  }
+]
+
 describe('MistakesPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  it('renders 7:3 layout, supports chapter filtering and shows wrong-answer feedback', async () => {
+  it('hides subtitle, defaults chapter tree to collapsed, and supports single-choice wrong feedback', async () => {
     const requestParams = []
-
     api.get.mockImplementation((url, config) => {
       if (url === '/chapters/tree') {
-        return Promise.resolve({
-          data: {
-            code: 0,
-            data: [
-              {
-                id: 1,
-                title: '高等数学上册',
-                children: [
-                  {
-                    id: 2,
-                    title: '函数',
-                    children: [{ id: 4, title: '函数的定义域', children: [] }]
-                  }
-                ]
-              }
-            ]
-          }
-        })
+        return Promise.resolve({ data: { code: 0, data: chapterTree } })
       }
-
       requestParams.push(config?.params ?? {})
       return Promise.resolve({
         data: {
@@ -80,16 +75,18 @@ describe('MistakesPage', () => {
     })
     await flushPromises()
 
+    expect(wrapper.find('.library-head p').exists()).toBe(false)
+    expect(wrapper.find('.section-link').exists()).toBe(false)
+
+    await wrapper.find('.book-toggle').trigger('click')
+    await wrapper.find('.chapter-toggle').trigger('click')
+    await flushPromises()
     await wrapper.find('.section-link').trigger('click')
     await flushPromises()
 
     expect(requestParams).toContainEqual({})
     expect(requestParams).toContainEqual({ chapterId: 4 })
-    expect(wrapper.find('.mistake-layout').exists()).toBe(true)
-    expect(wrapper.find('.mistake-card-detail').exists()).toBe(true)
-    expect(wrapper.find('.chapter-tree-card').exists()).toBe(true)
     expect(wrapper.text()).toContain('2016 年 408 真题 第 9 题')
-    expect(wrapper.text()).toContain('函数的定义域')
     expect(wrapper.text()).toContain('加入收藏本')
 
     const options = wrapper.findAll('.mistake-option')
@@ -112,15 +109,10 @@ describe('MistakesPage', () => {
     })
   })
 
-  it('shows success feedback when the selected answer is correct', async () => {
+  it('supports multi-choice answer format compatible with study page', async () => {
     api.get.mockImplementation((url) => {
       if (url === '/chapters/tree') {
-        return Promise.resolve({
-          data: {
-            code: 0,
-            data: [{ id: 1, title: '高等数学上册', children: [] }]
-          }
-        })
+        return Promise.resolve({ data: { code: 0, data: chapterTree } })
       }
       return Promise.resolve({
         data: {
@@ -131,14 +123,14 @@ describe('MistakesPage', () => {
               questionId: 101,
               chapterId: 4,
               difficulty: 'MEDIUM',
-              questionTitle: '函数单调性',
-              questionContent: '已知 f(x)=x^2，正确选项是？',
+              questionTitle: '集合运算',
+              questionContent: '下列哪些选项属于集合 A？',
               imageUrl: null,
               status: 'REVIEWING',
-              questionType: 'SINGLE',
-              options: ['A. 单调递减', 'B. 在全域单调递增', 'C. 关于 y 轴对称', 'D. 恒为负数'],
-              correctAnswer: 'C',
-              explanation: 'x^2 是偶函数，图像关于 y 轴对称。',
+              questionType: 'MULTI',
+              options: ['A. 1', 'B. 2', 'C. 3', 'D. 4'],
+              correctAnswer: 'A,C',
+              explanation: '集合 A 中包含 1 和 3。',
               sourceLabel: '教材例题',
               createdAt: '2026-04-25T10:00:00',
               updatedAt: '2026-04-25T10:00:00',
@@ -155,12 +147,86 @@ describe('MistakesPage', () => {
     await flushPromises()
 
     const options = wrapper.findAll('.mistake-option')
+    await options[0].trigger('click')
     await options[2].trigger('click')
     await wrapper.find('.check-answer-btn').trigger('click')
     await flushPromises()
 
+    expect(options[0].classes()).toContain('correct')
     expect(options[2].classes()).toContain('correct')
     expect(wrapper.text()).toContain('回答正确！')
-    expect(wrapper.text()).toContain('解析：')
+    expect(wrapper.text()).toContain('正确答案：')
+    expect(wrapper.text()).toContain('A,C')
+  })
+
+  it('supports fill-answer checking and readonly fallback for legacy items', async () => {
+    api.get.mockImplementation((url) => {
+      if (url === '/chapters/tree') {
+        return Promise.resolve({ data: { code: 0, data: chapterTree } })
+      }
+      return Promise.resolve({
+        data: {
+          code: 0,
+          data: [
+            {
+              id: 3,
+              questionId: 102,
+              chapterId: 4,
+              difficulty: 'MEDIUM',
+              questionTitle: '函数值计算',
+              questionContent: '已知 f(x)=2x+1，则 f(3)=？',
+              imageUrl: null,
+              status: 'REVIEWING',
+              questionType: 'FILL',
+              options: [],
+              correctAnswer: '7',
+              explanation: '代入 x=3，可得 2×3+1=7。',
+              sourceLabel: '教材例题',
+              createdAt: '2026-04-25T10:00:00',
+              updatedAt: '2026-04-25T10:00:00',
+              analysis: null
+            },
+            {
+              id: 4,
+              questionId: null,
+              chapterId: 4,
+              difficulty: null,
+              questionTitle: '旧错题',
+              questionContent: '旧题内容',
+              imageUrl: null,
+              status: 'REVIEWING',
+              questionType: null,
+              options: [],
+              correctAnswer: null,
+              explanation: null,
+              sourceLabel: null,
+              createdAt: '2026-04-25T10:00:00',
+              updatedAt: '2026-04-25T10:00:00',
+              analysis: null
+            }
+          ]
+        }
+      })
+    })
+
+    const wrapper = mount(MistakesPage, {
+      global: { plugins: [createPinia()] }
+    })
+    await flushPromises()
+
+    const input = wrapper.find('.fill-answer input')
+    await input.setValue('7')
+    await wrapper.find('.fill-row .outline-btn').trigger('click')
+    await wrapper.find('.check-answer-btn').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('回答正确！')
+    expect(wrapper.text()).toContain('代入 x=3，可得 2×3+1=7。')
+
+    await wrapper.find('.mistake-toolbar__actions .outline-btn:last-child').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('题目原始作答数据缺失，当前仅支持加入收藏本或删除。')
+    expect(wrapper.find('.check-answer-btn').attributes('disabled')).toBeDefined()
   })
 })

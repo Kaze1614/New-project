@@ -1,7 +1,7 @@
 <template>
   <section class="review-page">
     <header class="study-head">
-      <h2>前去复习</h2>
+      <h2>待复习</h2>
     </header>
 
     <div v-if="reviewStore.loading" class="panel-card">正在加载待复习题库...</div>

@@ -2,7 +2,6 @@
   <section class="library-page mistake-workbench">
     <header class="library-head">
       <h2>我的错题本</h2>
-      <p>左侧聚焦当前错题作答，右侧按册、章、节筛选定位，便于快速回看与整理。</p>
     </header>
 
     <div class="mistake-layout">
@@ -45,7 +44,7 @@
             <span class="tag chapter">{{ sectionLabel(activeMistake.chapterId) }}</span>
           </div>
 
-          <div v-if="canCheckAnswer" class="mistake-options">
+          <div v-if="isChoice(activeMistake)" class="mistake-options">
             <button
               v-for="option in activeMistake.options"
               :key="option"
@@ -59,8 +58,16 @@
             </button>
           </div>
 
+          <label v-else-if="isFill(activeMistake) && canCheckAnswer" class="fill-answer">
+            作答区域
+            <div class="fill-row">
+              <input v-model.trim="fillDraft" type="text" maxlength="200" @keyup.enter="saveFillAnswer" />
+              <button class="outline-btn" type="button" @click="saveFillAnswer">保存答案</button>
+            </div>
+          </label>
+
           <div v-else class="mistake-readonly-tip">
-            当前错题缺少原题选项数据，暂不支持在线检查答案，可继续加入收藏本或删除。
+            题目原始作答数据缺失，当前仅支持加入收藏本或删除。
           </div>
 
           <button
@@ -79,7 +86,6 @@
             </div>
 
             <div class="mistake-feedback" :class="isCorrectAnswer ? 'success' : 'danger'">
-              <span class="mistake-feedback__icon">{{ isCorrectAnswer ? '✓' : '!' }}</span>
               <span>{{ isCorrectAnswer ? '回答正确！' : '回答错误！' }}</span>
             </div>
 
@@ -160,7 +166,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { api, unwrap } from '../api/client'
 import { useLibraryStore } from '../stores/library'
 import { buildSectionLabelMap, resolveSectionLabel } from '../utils/chapterLabels'
@@ -173,6 +179,7 @@ const chapterTree = ref([])
 const sectionLabelMap = ref(new Map())
 const expandedBooks = ref(new Set())
 const expandedChapters = ref(new Set())
+const fillDraft = ref('')
 
 const activeMistake = computed(() => libraryStore.activeMistake)
 const activeIndex = computed(() => {
@@ -182,8 +189,20 @@ const activeIndex = computed(() => {
 const canCheckAnswer = computed(() => libraryStore.canCheckActiveMistake)
 const isCorrectAnswer = computed(() => {
   if (!activeMistake.value || !libraryStore.isAnswerRevealed) return false
-  return normalizeAnswer(activeMistake.value.correctAnswer) === normalizeAnswer(libraryStore.selectedMistakeAnswer)
+  return answersEqual(activeMistake.value, activeMistake.value.correctAnswer, libraryStore.selectedMistakeAnswer)
 })
+
+watch(
+  activeMistake,
+  (item) => {
+    if (!item) {
+      fillDraft.value = ''
+      return
+    }
+    fillDraft.value = isFill(item) ? libraryStore.selectedMistakeAnswer : ''
+  },
+  { immediate: true }
+)
 
 onMounted(async () => {
   filters.keyword = libraryStore.mistakeFilters.keyword || ''
@@ -194,10 +213,8 @@ async function loadChapterTree() {
   try {
     chapterTree.value = await unwrap(api.get('/chapters/tree'))
     sectionLabelMap.value = buildSectionLabelMap(chapterTree.value)
-    expandedBooks.value = new Set(chapterTree.value.map((item) => item.id))
-    expandedChapters.value = new Set(
-      chapterTree.value.flatMap((book) => (book.children || []).map((chapter) => chapter.id))
-    )
+    expandedBooks.value = new Set()
+    expandedChapters.value = new Set()
   } catch {
     chapterTree.value = []
     sectionLabelMap.value = new Map()
@@ -229,8 +246,16 @@ function sectionLabel(chapterId) {
   return resolveSectionLabel(sectionLabelMap.value, chapterId)
 }
 
+function isChoice(item) {
+  return ['SINGLE', 'MULTI'].includes(item?.questionType) && Array.isArray(item?.options) && item.options.length > 0
+}
+
+function isFill(item) {
+  return item?.questionType === 'FILL'
+}
+
 function optionCode(option) {
-  return String(option).split('.')[0]?.trim() || ''
+  return extractOptionCode(option)
 }
 
 function optionText(option) {
@@ -242,29 +267,73 @@ function normalizeAnswer(value) {
   return String(value || '').trim().toUpperCase()
 }
 
+function extractOptionCode(option) {
+  const match = String(option).match(/^([A-Z])/)
+  return match ? match[1] : String(option).trim().toUpperCase()
+}
+
+function selectedCodes(value = libraryStore.selectedMistakeAnswer) {
+  return String(value || '')
+    .split(',')
+    .map((item) => item.trim().toUpperCase())
+    .filter(Boolean)
+}
+
+function sortedCodes(value) {
+  return selectedCodes(value).sort().join(',')
+}
+
+function answersEqual(item, expected, actual) {
+  if (!item) return false
+  if (item.questionType === 'MULTI') {
+    return sortedCodes(expected) === sortedCodes(actual)
+  }
+  return normalizeAnswer(expected) === normalizeAnswer(actual)
+}
+
 function pickOption(option) {
-  if (!canCheckAnswer.value || libraryStore.isAnswerRevealed) return
-  libraryStore.setMistakeAnswer(optionCode(option))
+  if (!canCheckAnswer.value || libraryStore.isAnswerRevealed || !activeMistake.value) return
+  const code = extractOptionCode(option)
+
+  if (activeMistake.value.questionType === 'MULTI') {
+    const next = new Set(selectedCodes())
+    next.has(code) ? next.delete(code) : next.add(code)
+    libraryStore.setMistakeAnswer([...next].sort().join(','))
+    return
+  }
+
+  libraryStore.setMistakeAnswer(code)
+}
+
+function isSelected(option) {
+  return selectedCodes().includes(extractOptionCode(option))
 }
 
 function optionClass(option) {
-  const code = optionCode(option)
+  const code = extractOptionCode(option)
   if (!libraryStore.isAnswerRevealed) {
     return {
-      selected: normalizeAnswer(libraryStore.selectedMistakeAnswer) === code
+      selected: isSelected(option)
     }
   }
   return {
-    selected: normalizeAnswer(libraryStore.selectedMistakeAnswer) === code,
-    correct: normalizeAnswer(activeMistake.value?.correctAnswer) === code,
-    wrong:
-      normalizeAnswer(libraryStore.selectedMistakeAnswer) === code &&
-      normalizeAnswer(activeMistake.value?.correctAnswer) !== code
+    selected: isSelected(option),
+    correct: selectedCodes(activeMistake.value?.correctAnswer).includes(code),
+    wrong: isSelected(option) && !selectedCodes(activeMistake.value?.correctAnswer).includes(code)
   }
+}
+
+function saveFillAnswer() {
+  if (!isFill(activeMistake.value) || libraryStore.isAnswerRevealed) return
+  libraryStore.setMistakeAnswer(fillDraft.value.trim())
 }
 
 function checkAnswer() {
   if (!canCheckAnswer.value || !libraryStore.selectedMistakeAnswer) return
+  if (isFill(activeMistake.value)) {
+    saveFillAnswer()
+    if (!libraryStore.selectedMistakeAnswer) return
+  }
   libraryStore.revealActiveMistake()
 }
 

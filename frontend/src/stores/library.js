@@ -29,7 +29,10 @@ export const useLibraryStore = defineStore('library', {
       return state.mistakes.find((item) => item.id === state.selectedMistakeId) ?? state.mistakes[0]
     },
     canCheckActiveMistake() {
-      return this.activeMistake?.questionType === 'SINGLE' && Array.isArray(this.activeMistake?.options) && this.activeMistake.options.length > 0
+      const item = this.activeMistake
+      if (!item?.questionType || !item?.correctAnswer) return false
+      if (item.questionType === 'FILL') return true
+      return ['SINGLE', 'MULTI'].includes(item.questionType) && Array.isArray(item.options) && item.options.length > 0
     },
     isAnswerRevealed() {
       return this.activeMistake && this.revealedMistakeId === this.activeMistake.id
