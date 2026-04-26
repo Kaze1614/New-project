@@ -34,7 +34,6 @@
           </div>
 
           <div class="mistake-question-head">
-            <h3>{{ activeMistake.questionTitle }}</h3>
             <time>{{ formatDate(activeMistake.updatedAt || activeMistake.createdAt) }}</time>
           </div>
 

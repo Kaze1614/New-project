@@ -17,7 +17,7 @@ export const useLibraryStore = defineStore('library', {
     loadingMistakes: false,
     loadingFavorites: false,
     mistakeFilters: { keyword: '', chapterId: null },
-    favoriteFilters: { keyword: '' },
+    favoriteFilters: { keyword: '', chapterId: null, bookId: null, chapterNodeId: null, sectionId: null },
     selectedMistakeId: null,
     selectedMistakeAnswer: '',
     revealedMistakeId: null,
@@ -61,8 +61,12 @@ export const useLibraryStore = defineStore('library', {
     async loadFavorites() {
       this.loadingFavorites = true
       try {
+        const params = cleanParams({
+          keyword: this.favoriteFilters.keyword,
+          chapterId: this.favoriteFilters.chapterId
+        })
         this.favorites = await unwrap(
-          api.get('/favorites', { params: cleanParams(this.favoriteFilters) })
+          api.get('/favorites', { params })
         )
       } finally {
         this.loadingFavorites = false

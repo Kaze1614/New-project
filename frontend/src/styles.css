@@ -780,9 +780,21 @@ button:focus-visible {
   gap: 12px;
 }
 
+.favorites-filter-bar {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.2fr) repeat(3, minmax(140px, 0.7fr)) auto;
+  gap: 12px;
+}
+
 .question-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--space-gap);
+}
+
+.favorites-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-gap);
 }
 
@@ -831,6 +843,38 @@ button:focus-visible {
 .card-actions {
   display: flex;
   gap: 10px;
+}
+
+.favorite-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: #fff;
+  box-shadow: var(--shadow-soft);
+  padding: 22px;
+  display: grid;
+  gap: 18px;
+  align-content: start;
+}
+
+.favorite-head {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.favorite-content {
+  font-size: 18px;
+}
+
+.favorite-date {
+  color: #607089;
+  font-size: 16px;
+  white-space: nowrap;
+  margin-left: auto;
+  text-align: right;
+}
+
+.favorite-actions {
+  margin-top: auto;
 }
 
 .mistake-layout {
@@ -890,8 +934,10 @@ button:focus-visible {
 
 .mistake-question-head {
   align-items: flex-start;
+  justify-content: flex-end;
   padding-bottom: 14px;
   border-bottom: 1px solid #e8edf5;
+  width: 100%;
 }
 
 .mistake-question-head h3 {
@@ -905,6 +951,8 @@ button:focus-visible {
   color: #607089;
   font-size: 18px;
   white-space: nowrap;
+  margin-left: auto;
+  text-align: right;
 }
 
 .mistake-question-content {
@@ -1874,6 +1922,10 @@ button:focus-visible {
     grid-template-columns: 1fr;
   }
 
+  .favorites-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .relation-strip,
   .editor-workspace,
   .source-card {
@@ -1955,6 +2007,10 @@ button:focus-visible {
     grid-template-columns: 1fr;
   }
 
+  .favorites-filter-bar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .dropzone,
   .url-row {
     grid-template-columns: 1fr;
@@ -1965,6 +2021,11 @@ button:focus-visible {
   }
 
   .filter-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .favorites-filter-bar,
+  .favorites-grid {
     grid-template-columns: 1fr;
   }
 

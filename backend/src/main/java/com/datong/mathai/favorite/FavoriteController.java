@@ -45,4 +45,13 @@ public class FavoriteController {
         favoriteService.delete(authService.requireUserId(authorization), id);
         return ApiResponse.ok(null);
     }
+
+    @PostMapping("/{id}/review")
+    public ApiResponse<Void> addToReview(
+        @RequestHeader(value = "Authorization", required = false) String authorization,
+        @PathVariable Long id
+    ) {
+        favoriteService.addToReview(authService.requireUserId(authorization), id);
+        return ApiResponse.ok(null);
+    }
 }
