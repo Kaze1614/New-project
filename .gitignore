@@ -15,3 +15,5 @@ backend/target/
 
 # temp
 *.log
+tmp/*.tsv
+tmp/docs/*.py
