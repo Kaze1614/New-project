@@ -10,14 +10,12 @@
       <article class="study-main">
         <div class="question-meta">
           <p class="question-index">第 {{ currentIndex + 1 }} / {{ reviewStore.tasks.length }} 题</p>
-          <span v-if="currentTask.sourceLabel" class="source-pill">{{ currentTask.sourceLabel }}</span>
+          <span v-if="currentSourceLabel" class="source-pill">{{ currentSourceLabel }}</span>
         </div>
 
         <h3 class="question-title">{{ currentTask.questionTitle }}</h3>
-        <p class="question-content">{{ currentTask.questionContent }}</p>
-        <p v-if="currentTask.sourceSnapshotPath" class="source-path">
-          原卷资源：{{ currentTask.sourceSnapshotPath }}
-        </p>
+        <p class="question-content">{{ currentQuestionContent }}</p>
+        <p v-if="currentTask.sourceSnapshotPath" class="source-path">原卷资源：{{ currentTask.sourceSnapshotPath }}</p>
 
         <div class="answer-panel">
           <template v-if="isChoice(currentTask)">
@@ -45,12 +43,7 @@
                   :disabled="reviewStore.submitted"
                   @keyup.enter="saveFillAnswer"
                 />
-                <button
-                  class="outline-btn"
-                  type="button"
-                  :disabled="reviewStore.submitted"
-                  @click="saveFillAnswer"
-                >
+                <button class="outline-btn" type="button" :disabled="reviewStore.submitted" @click="saveFillAnswer">
                   保存答案
                 </button>
               </div>
@@ -60,26 +53,14 @@
 
         <div v-if="reviewStore.submitted && currentTask.result" class="result-panel">
           <p><strong>正确答案：</strong>{{ currentTask.result.correctAnswer || '暂无' }}</p>
-          <p><strong>解析：</strong>{{ currentTask.result.explanation || '暂无解析' }}</p>
+          <p><strong>解析：</strong>{{ currentTask.result.explanation || '无' }}</p>
           <p><strong>本题结果：</strong>{{ resultLabel(currentTask.result) }}</p>
         </div>
 
         <footer class="study-actions">
           <button class="outline-btn" type="button" :disabled="currentIndex === 0" @click="goPrev">上一题</button>
-          <button
-            class="outline-btn"
-            type="button"
-            :disabled="currentIndex >= reviewStore.tasks.length - 1"
-            @click="goNext"
-          >
-            下一题
-          </button>
-          <button
-            class="primary-btn"
-            type="button"
-            :disabled="reviewStore.submitted || reviewStore.submitting"
-            @click="submitReview"
-          >
+          <button class="outline-btn" type="button" :disabled="currentIndex >= reviewStore.tasks.length - 1" @click="goNext">下一题</button>
+          <button class="primary-btn" type="button" :disabled="reviewStore.submitted || reviewStore.submitting" @click="submitReview">
             {{ reviewStore.submitting ? '提交中...' : '提交本组' }}
           </button>
         </footer>
@@ -115,6 +96,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useReviewStore } from '../stores/review'
+import { normalizeStudentSourceLabel, stripStudentQuestionNoPrefix } from '../utils/sourceLabel'
 
 const reviewStore = useReviewStore()
 
@@ -126,6 +108,8 @@ const tick = ref(Date.now())
 let timer = null
 
 const currentTask = computed(() => reviewStore.tasks[currentIndex.value] ?? null)
+const currentSourceLabel = computed(() => normalizeStudentSourceLabel(currentTask.value?.sourceLabel))
+const currentQuestionContent = computed(() => stripStudentQuestionNoPrefix(currentTask.value?.questionContent))
 
 const elapsedSeconds = computed(() => {
   const end = reviewStore.submitted ? new Date(reviewStore.submittedAt).getTime() : tick.value

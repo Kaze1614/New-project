@@ -1,6 +1,7 @@
 package com.datong.mathai.study;
 
 import com.datong.mathai.common.AppException;
+import com.datong.mathai.question.QuestionSubQuestionPayload;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -147,6 +148,14 @@ public class StudyService {
         LocalDateTime now = LocalDateTime.now();
         for (SubmissionRow row : rows) {
             boolean correct = isAnswerCorrect(row.userAnswerJson(), row.answerJson());
+            if ("SOLUTION".equalsIgnoreCase(row.type())) {
+                jdbcTemplate.update(
+                    "UPDATE study_session_items SET is_correct = NULL, updated_at = ? WHERE id = ?",
+                    Timestamp.valueOf(now),
+                    row.itemId()
+                );
+                continue;
+            }
             jdbcTemplate.update(
                 "UPDATE study_session_items SET is_correct = ?, updated_at = ? WHERE id = ?",
                 correct ? 1 : 0,
@@ -178,7 +187,7 @@ public class StudyService {
             """
                 SELECT si.id AS item_id, si.question_id, si.sort_order, si.user_answer_json, si.is_correct, si.answered_at,
                        q.type, q.difficulty, q.title, q.content, q.options_json, q.answer_json, q.explanation,
-                       q.source_label, q.source_snapshot_path, q.explanation_source, q.explanation_review_status
+                       q.source_label, q.source_snapshot_path, q.explanation_source, q.explanation_review_status, q.sub_questions_json
                 FROM study_session_items si
                 JOIN questions q ON q.id = si.question_id
                 WHERE si.session_id = ?
@@ -196,12 +205,14 @@ public class StudyService {
                     rs.getString("content"),
                     parseList(rs.getString("options_json")),
                     parseAnswerForDisplay(userAnswerJson),
+                    "SOLUTION".equalsIgnoreCase(rs.getString("type")) ? parseAnswerForDisplay(userAnswerJson) : null,
                     userAnswerJson != null && !userAnswerJson.isBlank(),
                     rs.getObject("is_correct") == null ? null : rs.getBoolean("is_correct"),
                     rs.getString("source_label"),
                     rs.getString("source_snapshot_path"),
                     rs.getString("explanation_source"),
                     rs.getString("explanation_review_status"),
+                    parseSubQuestions(rs.getString("sub_questions_json")),
                     reveal ? parseAnswerForDisplay(rs.getString("answer_json")) : null,
                     reveal ? rs.getString("explanation") : null,
                     rs.getTimestamp("answered_at") == null ? null : rs.getTimestamp("answered_at").toLocalDateTime()
@@ -471,6 +482,18 @@ public class StudyService {
     }
 
     private List<String> parseList(String rawJson) {
+        if (rawJson == null || rawJson.isBlank()) {
+            return Collections.emptyList();
+        }
+        try {
+            return objectMapper.readValue(rawJson, new TypeReference<>() {
+            });
+        } catch (Exception ex) {
+            return Collections.emptyList();
+        }
+    }
+
+    private List<QuestionSubQuestionPayload> parseSubQuestions(String rawJson) {
         if (rawJson == null || rawJson.isBlank()) {
             return Collections.emptyList();
         }

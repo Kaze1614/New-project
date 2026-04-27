@@ -1,5 +1,6 @@
 package com.datong.mathai.config;
 
+import com.datong.mathai.admin.AdminMathQuestionService;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.jdbc.core.ConnectionCallback;
@@ -16,9 +17,11 @@ import java.util.TreeSet;
 public class SchemaMigrationRunner implements ApplicationRunner {
 
     private final JdbcTemplate jdbcTemplate;
+    private final AdminMathQuestionService adminMathQuestionService;
 
-    public SchemaMigrationRunner(JdbcTemplate jdbcTemplate) {
+    public SchemaMigrationRunner(JdbcTemplate jdbcTemplate, AdminMathQuestionService adminMathQuestionService) {
         this.jdbcTemplate = jdbcTemplate;
+        this.adminMathQuestionService = adminMathQuestionService;
     }
 
     @Override
@@ -30,6 +33,15 @@ public class SchemaMigrationRunner implements ApplicationRunner {
 
         Set<String> questionColumns = loadColumns("questions");
         ensureColumn(questionColumns, "questions", "source_math_question_id", "BIGINT NULL");
+        ensureColumn(questionColumns, "questions", "sub_questions_json", "LONGTEXT NULL");
+        demoteLegacyRuntimeQuestions();
+
+        Set<String> mathQuestionColumns = loadColumns("math_questions");
+        ensureColumn(mathQuestionColumns, "math_questions", "question_type", "VARCHAR(24) NOT NULL DEFAULT 'FILL'");
+        ensureColumn(mathQuestionColumns, "math_questions", "options_json", "LONGTEXT NULL");
+        ensureColumn(mathQuestionColumns, "math_questions", "answer_json", "LONGTEXT NULL");
+        ensureColumn(mathQuestionColumns, "math_questions", "sub_questions_json", "LONGTEXT NULL");
+        adminMathQuestionService.syncExistingRuntimeQuestions();
 
         Set<String> mistakeColumns = loadColumns("mistake_records");
         ensureColumn(mistakeColumns, "mistake_records", "question_id", "BIGINT NULL");
@@ -69,5 +81,15 @@ public class SchemaMigrationRunner implements ApplicationRunner {
         }
         jdbcTemplate.execute("ALTER TABLE " + tableName + " ADD COLUMN " + columnName + " " + definition);
         existingColumns.add(columnName.toLowerCase(Locale.ROOT));
+    }
+
+    private void demoteLegacyRuntimeQuestions() {
+        jdbcTemplate.update(
+            """
+                UPDATE questions
+                SET import_status = 'LEGACY_SEED'
+                WHERE import_status = 'READY' AND source_math_question_id IS NULL
+                """
+        );
     }
 }

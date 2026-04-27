@@ -1,16 +1,28 @@
 package com.datong.mathai.admin;
 
+import com.datong.mathai.question.QuestionOptionPayload;
+import com.datong.mathai.question.QuestionSubQuestionPayload;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+
+import java.util.List;
 
 public record MathQuestionRequest(
     @Size(max = 1024, message = "图片地址不能超过 1024 个字符")
     String imageUrl,
 
+    @NotBlank(message = "题型不能为空")
+    String questionType,
+
     @NotBlank(message = "题干不能为空")
     String rawTextLatex,
+
+    List<QuestionOptionPayload> options,
+
+    List<String> answers,
+
+    List<QuestionSubQuestionPayload> subQuestions,
 
     String answerLatex,
 
@@ -34,7 +46,6 @@ public record MathQuestionRequest(
     @Size(max = 80, message = "试卷来源不能超过 80 个字符")
     String sourcePaper,
 
-    @NotNull(message = "题号不能为空")
     @Min(value = 1, message = "题号必须大于 0")
     Integer questionNo
 ) {

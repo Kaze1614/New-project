@@ -21,6 +21,8 @@ services:
       dockerfile: Dockerfile
     container_name: math-ai-backend
     environment:
+      TZ: Asia/Shanghai
+      JAVA_TOOL_OPTIONS: -Duser.timezone=Asia/Shanghai
       DB_URL: jdbc:mysql://mysql:3306/${DB_NAME:-math_ai}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
       DB_USERNAME: root
       DB_PASSWORD: ${DB_PASSWORD:-root}

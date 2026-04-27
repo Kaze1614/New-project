@@ -30,11 +30,14 @@ public class AdminMathQuestionController {
     public ApiResponse<PageResult<MathQuestionListItem>> list(
         @RequestHeader(value = "Authorization", required = false) String authorization,
         @RequestParam(required = false) String keyword,
+        @RequestParam(required = false) Long bookId,
+        @RequestParam(required = false) Long chapterId,
+        @RequestParam(required = false) Long sectionId,
         @RequestParam(required = false) Integer page,
         @RequestParam(required = false) Integer size
     ) {
         authService.requireAdminUserId(authorization);
-        return ApiResponse.ok(mathQuestionService.list(keyword, page, size));
+        return ApiResponse.ok(mathQuestionService.list(keyword, bookId, chapterId, sectionId, page, size));
     }
 
     @GetMapping("/{id}")

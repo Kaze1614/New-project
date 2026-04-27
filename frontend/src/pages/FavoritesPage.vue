@@ -8,21 +8,21 @@
       <input v-model.trim="filters.keyword" type="text" placeholder="搜索收藏题目、关键词" />
 
       <select v-model="filters.bookId" @change="onBookChange">
-        <option value="">全部册</option>
+        <option value="">全部教材</option>
         <option v-for="book in bookOptions" :key="book.id" :value="String(book.id)">
           {{ book.title }}
         </option>
       </select>
 
       <select v-model="filters.chapterId" :disabled="!chapterOptions.length" @change="onChapterChange">
-        <option value="">全部章</option>
+        <option value="">全部章节</option>
         <option v-for="chapter in chapterOptions" :key="chapter.id" :value="String(chapter.id)">
           {{ chapter.title }}
         </option>
       </select>
 
       <select v-model="filters.sectionId" :disabled="!sectionOptions.length">
-        <option value="">全部节</option>
+        <option value="">全部小节</option>
         <option v-for="section in sectionOptions" :key="section.id" :value="String(section.id)">
           {{ section.title }}
         </option>
@@ -43,7 +43,7 @@
           <time class="favorite-date">{{ formatDate(item.createdAt) }}</time>
         </div>
 
-        <p class="mistake-question-content favorite-content">{{ item.content }}</p>
+        <p class="mistake-question-content favorite-content">{{ questionContentText(item) }}</p>
 
         <div class="mistake-section-row">
           <span class="tag chapter">{{ sectionLabel(item.chapterId) }}</span>
@@ -97,12 +97,12 @@
           </div>
 
           <div class="mistake-feedback" :class="isCorrectAnswer(item) ? 'success' : 'danger'">
-            <span>{{ isCorrectAnswer(item) ? '回答正确！' : '回答错误！' }}</span>
+            <span>{{ isCorrectAnswer(item) ? '回答正确。' : '回答错误。' }}</span>
           </div>
 
           <div class="mistake-explanation-box">
             <strong>解析：</strong>
-            <p>{{ item.explanation || '暂无解析' }}</p>
+            <p>{{ item.explanation || '无' }}</p>
           </div>
         </div>
 
@@ -120,6 +120,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { api, unwrap } from '../api/client'
 import { useLibraryStore } from '../stores/library'
 import { buildSectionLabelMap, resolveSectionLabel } from '../utils/chapterLabels'
+import { normalizeStudentSourceLabel, stripStudentQuestionNoPrefix } from '../utils/sourceLabel'
 
 const libraryStore = useLibraryStore()
 const chapterTree = ref([])
@@ -202,7 +203,11 @@ function onChapterChange() {
 }
 
 function sourceText(item) {
-  return item?.sourceLabel || '题目来源未标注'
+  return normalizeStudentSourceLabel(item?.sourceLabel) || '题目来源未标注'
+}
+
+function questionContentText(item) {
+  return stripStudentQuestionNoPrefix(item?.content)
 }
 
 function sectionLabel(chapterId) {
@@ -304,9 +309,7 @@ function isSelected(item, option) {
 function optionClass(item, option) {
   const code = extractOptionCode(option)
   if (!isRevealed(item.id)) {
-    return {
-      selected: isSelected(item, option)
-    }
+    return { selected: isSelected(item, option) }
   }
   return {
     selected: isSelected(item, option),

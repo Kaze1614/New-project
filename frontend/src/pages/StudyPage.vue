@@ -10,14 +10,12 @@
       <article class="study-main">
         <div class="question-meta">
           <p class="question-index">第 {{ currentIndex + 1 }} / {{ session.items.length }} 题</p>
-          <span v-if="currentItem.sourceLabel" class="source-pill">{{ currentItem.sourceLabel }}</span>
+          <span v-if="currentSourceLabel" class="source-pill">{{ currentSourceLabel }}</span>
         </div>
 
         <h3 class="question-title">{{ currentItem.title }}</h3>
-        <p class="question-content">{{ currentItem.content }}</p>
-        <p v-if="currentItem.sourceSnapshotPath" class="source-path">
-          原卷资源：{{ currentItem.sourceSnapshotPath }}
-        </p>
+        <p class="question-content">{{ currentQuestionContent }}</p>
+        <p v-if="currentItem.sourceSnapshotPath" class="source-path">原卷资源：{{ currentItem.sourceSnapshotPath }}</p>
 
         <div class="answer-panel">
           <template v-if="isChoice(currentItem)">
@@ -33,6 +31,21 @@
             </button>
           </template>
 
+          <template v-else-if="isSolution(currentItem)">
+            <label class="fill-answer solution-answer">
+              作答区域
+              <div class="fill-row fill-row--stacked">
+                <textarea
+                  v-model.trim="solutionDraft"
+                  rows="8"
+                  maxlength="2000"
+                  placeholder="输入学生作答文本，提交后仅展示参考答案与解析，不自动判分。"
+                ></textarea>
+                <button class="outline-btn" type="button" @click="saveSolutionAnswer">保存作答</button>
+              </div>
+            </label>
+          </template>
+
           <template v-else>
             <label class="fill-answer">
               作答区域
@@ -45,32 +58,38 @@
         </div>
 
         <div v-if="session.submitted" class="result-panel">
-          <p>
-            <strong>正确答案：</strong>
-            {{ currentItem.officialAnswer || '暂无' }}
-          </p>
+          <template v-if="isSolution(currentItem)">
+            <div v-if="currentItem.subQuestions?.length" class="solution-result-block">
+              <article
+                v-for="(subQuestion, index) in currentItem.subQuestions"
+                :key="`${currentItem.itemId}-${index}`"
+                class="solution-result-card"
+              >
+                <h4>（{{ index + 1 }}）{{ subQuestion.prompt }}</h4>
+                <p><strong>参考答案：</strong>{{ subQuestion.referenceAnswer || '暂无' }}</p>
+              </article>
+            </div>
+            <p v-else>
+              <strong>正确答案：</strong>
+              {{ currentItem.officialAnswer || '暂无' }}
+            </p>
+          </template>
+          <template v-else>
+            <p>
+              <strong>正确答案：</strong>
+              {{ currentItem.officialAnswer || '暂无' }}
+            </p>
+          </template>
           <p>
             <strong>解析：</strong>
-            {{ currentItem.officialExplanation || '暂无解析' }}
+            {{ currentItem.officialExplanation || '无' }}
           </p>
         </div>
 
         <footer class="study-actions">
           <button class="outline-btn" type="button" :disabled="currentIndex === 0" @click="goPrev">上一题</button>
-          <button
-            class="outline-btn"
-            type="button"
-            :disabled="currentIndex >= session.items.length - 1"
-            @click="goNext"
-          >
-            下一题
-          </button>
-          <button
-            class="primary-btn"
-            type="button"
-            :disabled="session.submitted || studyStore.submitting"
-            @click="submitSession"
-          >
+          <button class="outline-btn" type="button" :disabled="currentIndex >= session.items.length - 1" @click="goNext">下一题</button>
+          <button class="primary-btn" type="button" :disabled="session.submitted || studyStore.submitting" @click="submitSession">
             {{ studyStore.submitting ? '提交中...' : '提交本组' }}
           </button>
         </footer>
@@ -107,12 +126,14 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useStudyStore } from '../stores/study'
+import { normalizeStudentSourceLabel, stripStudentQuestionNoPrefix } from '../utils/sourceLabel'
 
 const route = useRoute()
 const studyStore = useStudyStore()
 
 const currentIndex = ref(0)
 const fillDraft = ref('')
+const solutionDraft = ref('')
 const tick = ref(Date.now())
 const localStartTime = ref(Date.now())
 const frozenElapsedSeconds = ref(null)
@@ -121,6 +142,8 @@ let timer = null
 
 const session = computed(() => studyStore.session)
 const currentItem = computed(() => session.value?.items?.[currentIndex.value] ?? null)
+const currentSourceLabel = computed(() => normalizeStudentSourceLabel(currentItem.value?.sourceLabel))
+const currentQuestionContent = computed(() => stripStudentQuestionNoPrefix(currentItem.value?.content))
 
 const elapsedSeconds = computed(() => {
   if (!session.value) return 0
@@ -141,6 +164,7 @@ const displayTime = computed(() => {
 watch(currentItem, (item) => {
   if (!item) return
   fillDraft.value = item.userAnswer || ''
+  solutionDraft.value = item.studentAnswerText || item.userAnswer || ''
 })
 
 watch(
@@ -166,6 +190,7 @@ onMounted(async () => {
   } catch (error) {
     actionError.value = error?.response?.data?.message || '创建刷题会话失败，请稍后重试'
   }
+
   timer = window.setInterval(() => {
     tick.value = Date.now()
   }, 1000)
@@ -177,6 +202,10 @@ onUnmounted(() => {
 
 function isChoice(item) {
   return ['SINGLE', 'MULTI'].includes(item?.type) && Array.isArray(item?.options) && item.options.length > 0
+}
+
+function isSolution(item) {
+  return item?.type === 'SOLUTION'
 }
 
 function extractOptionCode(option) {
@@ -220,6 +249,16 @@ async function saveFillAnswer() {
     await studyStore.saveAnswer(session.value.id, currentItem.value.itemId, fillDraft.value)
   } catch (error) {
     actionError.value = error?.response?.data?.message || '保存答案失败，请稍后重试'
+  }
+}
+
+async function saveSolutionAnswer() {
+  if (!session.value || !currentItem.value || session.value.submitted || !solutionDraft.value) return
+  actionError.value = ''
+  try {
+    await studyStore.saveAnswer(session.value.id, currentItem.value.itemId, solutionDraft.value)
+  } catch (error) {
+    actionError.value = error?.response?.data?.message || '保存作答失败，请稍后重试'
   }
 }
 

@@ -37,7 +37,7 @@
             <time>{{ formatDate(activeMistake.updatedAt || activeMistake.createdAt) }}</time>
           </div>
 
-          <p class="mistake-question-content">{{ activeMistake.questionContent }}</p>
+          <p class="mistake-question-content">{{ questionContentText(activeMistake) }}</p>
 
           <div class="mistake-section-row">
             <span class="tag chapter">{{ sectionLabel(activeMistake.chapterId) }}</span>
@@ -85,12 +85,12 @@
             </div>
 
             <div class="mistake-feedback" :class="isCorrectAnswer ? 'success' : 'danger'">
-              <span>{{ isCorrectAnswer ? '回答正确！' : '回答错误！' }}</span>
+              <span>{{ isCorrectAnswer ? '回答正确。' : '回答错误。' }}</span>
             </div>
 
             <div class="mistake-explanation-box">
               <strong>解析：</strong>
-              <p>{{ activeMistake.explanation || '暂无解析' }}</p>
+              <p>{{ activeMistake.explanation || '无' }}</p>
             </div>
           </div>
 
@@ -108,12 +108,7 @@
               <p class="eyebrow">章节筛选</p>
               <h3>章节目录</h3>
             </div>
-            <button
-              class="outline-btn"
-              type="button"
-              :disabled="!libraryStore.selectedChapterId"
-              @click="clearSectionFilter"
-            >
+            <button class="outline-btn" type="button" :disabled="!libraryStore.selectedChapterId" @click="clearSectionFilter">
               清空筛选
             </button>
           </div>
@@ -169,6 +164,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { api, unwrap } from '../api/client'
 import { useLibraryStore } from '../stores/library'
 import { buildSectionLabelMap, resolveSectionLabel } from '../utils/chapterLabels'
+import { normalizeStudentSourceLabel, stripStudentQuestionNoPrefix } from '../utils/sourceLabel'
 
 const libraryStore = useLibraryStore()
 const filters = reactive({
@@ -231,7 +227,11 @@ async function applyFilters() {
 }
 
 function sourceText(item) {
-  return item?.sourceLabel || '题目来源未标注'
+  return normalizeStudentSourceLabel(item?.sourceLabel) || '题目来源未标注'
+}
+
+function questionContentText(item) {
+  return stripStudentQuestionNoPrefix(item?.questionContent)
 }
 
 function formatDate(value) {
@@ -311,9 +311,7 @@ function isSelected(option) {
 function optionClass(option) {
   const code = extractOptionCode(option)
   if (!libraryStore.isAnswerRevealed) {
-    return {
-      selected: isSelected(option)
-    }
+    return { selected: isSelected(option) }
   }
   return {
     selected: isSelected(option),

@@ -1,5 +1,7 @@
 package com.datong.mathai.review;
 
+import com.datong.mathai.question.QuestionSubQuestionPayload;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -17,6 +19,7 @@ public record ReviewTaskView(
     String sourceSnapshotPath,
     String explanationSource,
     String explanationReviewStatus,
+    List<QuestionSubQuestionPayload> subQuestions,
     String officialAnswer,
     String officialExplanation,
     LocalDateTime dueDate,

@@ -1,6 +1,7 @@
 package com.datong.mathai.review;
 
 import com.datong.mathai.common.AppException;
+import com.datong.mathai.question.QuestionSubQuestionPayload;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -147,6 +148,7 @@ public class ReviewService {
                 row.sourceSnapshotPath(),
                 row.explanationSource(),
                 row.explanationReviewStatus(),
+                row.subQuestions(),
                 row.officialAnswer(),
                 row.officialExplanation(),
                 now,
@@ -263,7 +265,7 @@ public class ReviewService {
         return """
             SELECT r.id, r.mistake_id, r.due_date, r.completed, r.suspended, r.repetition, r.interval_days, r.ease_factor, r.last_grade, r.completed_at,
                    m.question_id, m.chapter_id, m.difficulty, m.question_title, m.question_content,
-                   q.type, q.options_json, q.answer_json, q.explanation,
+                   q.type, q.options_json, q.answer_json, q.sub_questions_json, q.explanation,
                    q.source_label, q.source_snapshot_path, q.explanation_source, q.explanation_review_status
             FROM review_tasks r
             JOIN mistake_records m ON r.mistake_id = m.id
@@ -302,6 +304,7 @@ public class ReviewService {
             rs.getString("source_snapshot_path"),
             rs.getString("explanation_source"),
             rs.getString("explanation_review_status"),
+            parseSubQuestions(rs.getString("sub_questions_json")),
             rs.getTimestamp("due_date").toLocalDateTime(),
             rs.getBoolean("completed"),
             rs.getBoolean("suspended"),
@@ -328,6 +331,7 @@ public class ReviewService {
             row.sourceSnapshotPath(),
             row.explanationSource(),
             row.explanationReviewStatus(),
+            row.subQuestions(),
             row.officialAnswer(),
             row.officialExplanation(),
             row.dueDate(),
@@ -411,6 +415,18 @@ public class ReviewService {
         }
     }
 
+    private List<QuestionSubQuestionPayload> parseSubQuestions(String rawJson) {
+        if (rawJson == null || rawJson.isBlank()) {
+            return Collections.emptyList();
+        }
+        try {
+            return objectMapper.readValue(rawJson, new TypeReference<>() {
+            });
+        } catch (Exception ex) {
+            return Collections.emptyList();
+        }
+    }
+
     private record ReviewTaskRow(
         Long id,
         Long mistakeId,
@@ -428,6 +444,7 @@ public class ReviewService {
         String sourceSnapshotPath,
         String explanationSource,
         String explanationReviewStatus,
+        List<QuestionSubQuestionPayload> subQuestions,
         LocalDateTime dueDate,
         boolean completed,
         boolean suspended,
